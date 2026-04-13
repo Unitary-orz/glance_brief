@@ -1,51 +1,48 @@
-# openclaw-news-skills
+# glance_brief
 
-OpenClaw News 相关 Skills 集合。
+每日简报工具集，为 OpenClaw agent 提供结构化、可复用的报告生成能力。
+
+## 简报风格特点
+
+- **事实驱动**：只写已发生的事实，不写推断或趋势判断
+- **克制精确**：标题即核心信息，正文不超过两句话
+- **来源可查**：每条消息附带来源标签（NS/NA/DA/HN），可追溯
+- **结构固定**：国际/宏观/科技，板块清晰，扫描成本低
 
 ## Skills
 
 ### agents-report
 
-每日 OpenClaw 生态报告（agents-radar 生态日报）。
+每日 OpenClaw 生态报告。
 
 - **定时：** 每日 10:00 Asia/Shanghai
 - **数据：** agents-radar RSS（OpenClaw 生态 + GitHub Trending）
-- **安装：** 见 `skills/agents-report/SKILL.md`
+- **安装：** `skills/agents-report/INSTALL.md`
 
 ### noon-news
 
 每日午间热点简报。
 
 - **定时：** 每日 12:30 Asia/Shanghai
-- **数据：** news-aggregator + news-summary RSS + daily-ai-news
-- **安装：** 见 `skills/noon-news/SKILL.md`
+- **数据：** 多源新闻聚合（news-aggregator + news-summary RSS + daily-ai-news）
+- **安装：** `skills/noon-news/INSTALL.md`
 
-## 安装方式
-
-### 方式一：Git Sparse Checkout（推荐，只装一个）
+## 快速安装
 
 ```bash
-# 只装 agents-report
-git clone --filter=blob:none --sparse https://github.com/<you>/openclaw-news-skills.git
-cd openclaw-news-skills
+# 克隆仓库（稀疏克隆，只取目标 skill）
+git clone --filter=blob:none --sparse https://github.com/Unitary-orz/glance_brief.git
+cd glance_brief
+
+# 单独安装 agents-report
 git sparse-checkout set skills/agents-report
 
-# 或只装 noon-news
+# 或单独安装 noon-news
 git sparse-checkout set skills/noon-news
 ```
 
-### 方式二：全量克隆
+详细安装说明见各 skill 目录下的 `INSTALL.md`。
 
-```bash
-git clone https://github.com/<you>/openclaw-news-skills.git
-# 所有 skills 都在 skills/ 目录下
-```
+## 许可证
 
-## 依赖
-
-- `news-aggregator-skill`（noon-news 需要）
-- `news-summary`（noon-news 需要）
-- `daily-ai-news-skill`（noon-news 需要）
-- `agent-reach`（搜索补齐用）
-
-以上均通过 clawhub 安装或参考对应 SKILL.md。
+MIT License

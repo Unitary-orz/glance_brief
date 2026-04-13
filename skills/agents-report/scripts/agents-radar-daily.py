@@ -119,16 +119,4 @@ if __name__ == "__main__":
         parts.append(format_entry(feeds["trending"], "AI开源趋势"))
     
     output = '\n\n'.join(parts)
-    
-    # 保存到 data/news 目录
-    from datetime import datetime
-    import os
-    output_dir = "/root/.openclaw/workspace-lionclaw/data/news"
-    os.makedirs(output_dir, exist_ok=True)
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    output_path = os.path.join(output_dir, f"agents-radar-{today}.txt")
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(output)
-    print(f"Output saved to: {output_path}")
-    
     print(output)

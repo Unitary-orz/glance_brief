@@ -1,8 +1,8 @@
 # agents-radar 日报 任务操作手册
 
-> **任务 ID：** `ed0ceb97-cf5e-4afb-87c5-9148199e3181`
+> **任务 ID：** [创建 cron 任务后获得]
 > **定时：** 每日 10:00 Asia/Shanghai（`0 10 * * *`）
-> **目标：** 飞书群 `oc_76b918a1da88e33c679d6543d1ebfbe7`
+> **目标：** [配置为你的飞书群 ID]
 > **最近更新：** 2026-04-13
 
 > ⚠️ **Cron 配置关键字段（任务卡住的主因）**
@@ -135,7 +135,7 @@
 
 ```
 channel: feishu
-target: oc_76b918a1da88e33c679d6543d1ebfbe7
+target: [你的飞书群 ID]
 accountId: main
 timeoutSeconds: 600
 ```

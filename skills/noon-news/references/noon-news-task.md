@@ -9,9 +9,9 @@
 | 字段 | 值 |
 |------|-----|
 | **任务名称** | daily-hot-news-brief-1230 |
-| **Job ID** | `d37a6348-0322-433c-bf41-36176e169fab` |
+| **Job ID** | [创建 cron 任务后获得] |
 | **定时** | `30 12 * * *`（每日 12:30 Asia/Shanghai = 04:30 UTC） |
-| **发送目标** | 飞书群 `oc_76b918a1da88e33c679d6543d1ebfbe7` |
+| **发送目标** | [配置为你的飞书群 ID] |
 | **模型** | minimax-cn/MiniMax-M2.5 |
 | **超时** | 600s |
 | **运行状态** | 上次 `ok`（2026-04-13 04:30 UTC） |
@@ -115,7 +115,7 @@ curl -s "https://www.aljazeera.com/xml/rss/all.xml" | grep -E "<title>|<descript
 4. 发送必须使用 `message` 工具，参数：
    - `action=send`
    - `channel=feishu`
-   - `target=oc_76b918a1da88e33c679d6543d1ebfbe7`
+   - `target=[你的飞书群 ID]`
    - `accountId=main`
 5. 禁止使用 telegram channel
 
