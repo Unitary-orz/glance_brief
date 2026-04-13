@@ -45,15 +45,10 @@ type(scope): summary
 | `skill` | Skill 的定义、引用、路由、边界 |
 | `cron` | 定时任务配置、模板、调度 |
 | `news` | News 类报告（日报、简报） |
-| `install` | 安装流程、INSTALL 文档 |
-| `format` | 输出格式、写作规范、结构 |
-| `prompt` | Prompt 模板、内容约束 |
+| `repo` | 仓库治理、分支、CI、依赖 |
+| `docs` | 文档本身（README、说明文档） |
 | `publish` | clawhub / GitHub 发布 |
 | `sync` | 外部仓库同步 |
-| `repo` | 仓库治理（.gitignore、分支策略） |
-| `ci` | CI/CD 流水线 |
-| `deps` | 依赖安装、版本升级 |
-| `docs` | 文档本身（README、说明） |
 
 ---
 
@@ -62,17 +57,13 @@ type(scope): summary
 ```
 这次变更首先影响什么？
 
-├── Skill 的定义/引用/调用方式  → skill
-├── 定时任务的配置/模板/调度    → cron
-├── News 报告的结构/格式/规范    → news
-├── 安装流程/INSTALL 文档       → install
-├── Prompt 模板/内容约束         → prompt
-├── 输出格式/写作规范            → format
+├── Skill 的定义/引用/调用方式   → skill
+├── 定时任务的配置/模板/调度     → cron
+├── News 报告的结构/格式/规范   → news
+├── 仓库治理/CI/分支/依赖       → repo
+├── 仅 README/说明文档          → docs
 ├── clawhub/GitHub 发布         → publish
 ├── 外部仓库同步                → sync
-├── .gitignore/CI/分支管理      → repo
-├── 依赖安装/版本               → deps
-├── 仅 README/说明文档          → docs
 └── 其他                        → 选最贴近的主域
 ```
 
@@ -87,8 +78,8 @@ type(scope): summary
 - `docs(news)` 而非 `docs(files)`
 
 **产品域优先于技术层**：
-- ✅ `feat(nutrition)`、`fix(inventory)`
-- ❌ `feat(database)`、`fix(json)`
+- ✅ `feat(news)`、`fix(cron)`
+- ❌ `feat(database)`、`fix(config)`
 
 ---
 
@@ -119,27 +110,20 @@ rm(scope): 删除 [废弃内容]
 
 ```
 feat(skill): 新增 agents-report skill
-feat(news): 新增午间新闻定时任务
+feat(news): 新增午间简报定时任务
 
 fix(cron): 修复 agents-report 缺少 sessionTarget 配置
 fix(skill): 修复 prompts 路径与实际文件不匹配
 
-refactor(format): 重构 news-brief 模板结构
-refactor(install): 重构安装流程为 sparse-checkout 方式
-
-docs(skill): 新增 INSTALL.md 安装指南
-docs(format): 补充 GitHub Trending 分类合并规则
+refactor(news): 重构简报输出格式
+docs(repo): 完善 git commit 规范
 
 chore(repo): 添加 .gitignore
-chore(ci): 配置 GitHub Actions 测试
-chore(deps): 升级 feedparser 版本
+chore(ci): 配置 GitHub Actions
+build(deps): 升级 feedparser 版本
 
-sync(skill): 从 glance_brief 同步最新 prompt 模板
-rm(skill): 移除废弃的 v1 模板
-rm(docs): 删除重复的格式说明文档
-
-publish(skill): 首个正式版本发布
-release(v1): v1.0.0 发布，标记 milestone
+test(skill): 添加集成测试
+revert(cron): 回退 timeout 配置变更
 ```
 
 ---
