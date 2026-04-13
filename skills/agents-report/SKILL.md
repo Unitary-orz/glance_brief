@@ -2,7 +2,7 @@
 name: agents-report
 description: >-
   每日 OpenClaw 生态报告（agents-radar）定时任务 Skill。
-  抓取 agents-radar RSS，格式化后发送飞书群。
+  抓取 agents-radar RSS，格式化后发送至配置的消息渠道。
   使用时机：用户要求查看 OpenClaw 生态日报、Agents 趋势、GitHub Trending。
 ---
 

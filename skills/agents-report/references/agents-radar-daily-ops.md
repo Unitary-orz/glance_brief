@@ -2,7 +2,7 @@
 
 > **任务 ID：** [创建 cron 任务后获得]
 > **定时：** 每日 10:00 Asia/Shanghai（`0 10 * * *`）
-> **目标：** [配置为你的飞书群 ID]
+> **目标：** [配置为你的目标群/频道 ID]
 > **最近更新：** 2026-04-13
 
 > ⚠️ **Cron 配置关键字段（任务卡住的主因）**
@@ -134,8 +134,8 @@
 ## 7. 发送约束
 
 ```
-channel: feishu
-target: [你的飞书群 ID]
+channel: [渠道名]  # 示例：feishu
+target: [你的目标 ID]
 accountId: main
 timeoutSeconds: 600
 ```

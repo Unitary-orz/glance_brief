@@ -2,7 +2,7 @@
 name: noon-news
 description: >-
   每日午间热点简报定时任务 Skill。
-  综合多 news skills 输出「📰 今日热点简报」，发送飞书群。
+  综合多 news skills 输出「📰 今日热点简报」，发送至配置的消息渠道。
   使用时机：用户要求查看今日新闻、热点简报、午间新闻。
 ---
 

@@ -11,7 +11,7 @@
 | **任务名称** | daily-hot-news-brief-1230 |
 | **Job ID** | [创建 cron 任务后获得] |
 | **定时** | `30 12 * * *`（每日 12:30 Asia/Shanghai = 04:30 UTC） |
-| **发送目标** | [配置为你的飞书群 ID] |
+| **发送目标** | [配置为你的目标群/频道 ID] |
 | **模型** | [model] |
 | **超时** | 600s |
 | **运行状态** | 上次 `ok`（2026-04-13 04:30 UTC） |
@@ -114,8 +114,8 @@ curl -s "https://www.aljazeera.com/xml/rss/all.xml" | grep -E "<title>|<descript
 3. 汇总后需**去重**（同主题/同事件保留信息最完整一条）
 4. 发送必须使用 `message` 工具，参数：
    - `action=send`
-   - `channel=feishu`
-   - `target=[你的飞书群 ID]`
+   - `channel=[渠道名]`（示例：`feishu`）
+   - `target=[你的目标 ID]`
    - `accountId=main`
 5. 禁止使用 telegram channel
 
@@ -128,7 +128,7 @@ curl -s "https://www.aljazeera.com/xml/rss/all.xml" | grep -E "<title>|<descript
 | 无输出 | news-aggregator-script 执行失败 | 检查 Python 环境 |
 | 缺少国际新闻 | news-summary RSS 全部失败 | 确认网络可访问 BBC/Al Jazeera |
 | 内容重复 | 去重逻辑未生效 | 手动检查同主题条目 |
-| 发送失败 | 飞书 API 限流 | 等待后重试 |
+| 发送失败 | 消息平台 API 限流 | 等待后重试 |
 
 ---
 
