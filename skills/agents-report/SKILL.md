@@ -12,7 +12,7 @@ description: >-
 
 ## 数据来源
 
-- **脚本：** `scripts/agents-radar-daily.py`
+- **脚本：** `skills/agents-report/scripts/agents-radar-daily.py`
 - **Feed：** https://duanyytop.github.io/agents-radar/feed.xml
 - **RSS 分区：**
   - `ai-agents`：OpenClaw 生态日报（主项目 + 生态项目）
