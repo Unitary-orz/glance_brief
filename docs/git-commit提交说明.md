@@ -48,7 +48,6 @@ type(scope): summary
 | `repo` | 仓库治理、分支、CI、依赖 |
 | `docs` | 文档本身（README、说明文档） |
 | `publish` | clawhub / GitHub 发布 |
-| `sync` | 外部仓库同步 |
 
 ---
 
@@ -63,7 +62,6 @@ type(scope): summary
 ├── 仓库治理/CI/分支/依赖       → repo
 ├── 仅 README/说明文档          → docs
 ├── clawhub/GitHub 发布         → publish
-├── 外部仓库同步                → sync
 └── 其他                        → 选最贴近的主域
 ```
 
