@@ -41,7 +41,7 @@ clawhub install daily-ai-news-skill
   "delivery": {
     "mode": "announce",
     "channel": "feishu",
-    "to": "[你的飞书群 ID]",
+    "to": "[你的目标 ID]",
     "accountId": "main"
   }
 }
