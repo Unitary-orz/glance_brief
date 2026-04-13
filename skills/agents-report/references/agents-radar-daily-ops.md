@@ -8,7 +8,7 @@
 > ⚠️ **Cron 配置关键字段（任务卡住的主因）**
 > - `sessionTarget: "isolated"` — 必须在独立会话运行，否则被主会话历史卡住
 > - `wakeMode: "now"`
-> - `payload.model: "minimax-cn/MiniMax-M2.5"`
+> - `payload.model: "[model]"`
 > - `payload.timeoutSeconds: 600`
 > - `delivery.mode: "announce"`
 > - 发送参数必须含 `accountId=main`
@@ -17,7 +17,7 @@
 
 ## 1. 数据来源
 
-**脚本：** `python3 /root/.openclaw/workspace-lionclaw/scripts/agents-radar-daily.py`
+**脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py`
 
 **Feed：** [agents-radar feed.xml](https://duanyytop.github.io/agents-radar/feed.xml)
 
@@ -147,6 +147,6 @@ timeoutSeconds: 600
 | 文件 | 路径 |
 |------|------|
 | RSS 脚本 | `scripts/agents-radar-daily.py` |
-| Cron 配置 | `/root/.openclaw/cron/jobs.json` |
+| Cron 配置 | 在 OpenClaw 管理界面配置 |
 | 本文档 | `tasks/news/agents-radar-daily-ops.md` |
 | 输出存档 | `data/news/agents-radar-YYYY-MM-DD.md` |

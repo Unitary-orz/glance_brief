@@ -12,7 +12,7 @@
 | **Job ID** | [创建 cron 任务后获得] |
 | **定时** | `30 12 * * *`（每日 12:30 Asia/Shanghai = 04:30 UTC） |
 | **发送目标** | [配置为你的飞书群 ID] |
-| **模型** | minimax-cn/MiniMax-M2.5 |
+| **模型** | [model] |
 | **超时** | 600s |
 | **运行状态** | 上次 `ok`（2026-04-13 04:30 UTC） |
 
@@ -25,7 +25,7 @@
 ### 1. news-aggregator-skill（优先）
 
 ```bash
-python3 ~/.openclaw/workspace-lionclaw/skills/news-aggregator-skill/scripts/fetch_news.py \
+python3 ~/.openclaw/skills/news-aggregator-skill/scripts/fetch_news.py \
   --source hackernews,github,producthunt,36kr,tencent,weibo,wallstreetcn,v2ex \
   --limit 8
 ```

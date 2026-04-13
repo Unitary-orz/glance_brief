@@ -22,7 +22,7 @@ description: >-
 ### 1. news-aggregator-skill（优先）
 
 ```bash
-python3 ~/.openclaw/workspace-lionclaw/skills/news-aggregator-skill/scripts/fetch_news.py \
+python3 ~/.openclaw/skills/news-aggregator-skill/scripts/fetch_news.py \
   --source hackernews,github,producthunt,36kr,tencent,weibo,wallstreetcn,v2ex --limit 8
 ```
 
