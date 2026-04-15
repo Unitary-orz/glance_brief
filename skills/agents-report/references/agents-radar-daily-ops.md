@@ -98,12 +98,25 @@
 
 ---
 
-## 5. 项目展示格式
+## 5. 项目展示格式（2026-04-15 修复）
+
+**所有项目必须有完整链接！**
 
 | 类型 | 格式 |
 |------|------|
-| 有 ★/日 | `① 最热：[项目名](URL)「一句话简介」(+数字★/日)` |
-| 无 ★/日 | `② 其他：项目名「几字简介」、项目名「几字简介」...` |
+| 有 ★/日 | `① 最热：[项目名](https://github.com/owner/repo)「一句话简介」(+数字★/日)` |
+| 无 ★/日 | `② 其他：[项目名](https://github.com/owner/repo)「简介」、[项目名](https://github.com/owner/repo)「简介」...` |
+
+**示例：**
+```
+🔧 AI 基础工具
+① 最热：[hermes-agent](https://github.com/NousResearch/hermes-agent)「可进化Agent框架」(+8301★/日)
+② 其他：[claude-mem](https://github.com/thedotmack/claude-mem)「会话记忆」、[markitdown](https://github.com/microsoft/markitdown)「文档转换」
+
+📦 AI 应用 & 🧠 大模型/训练 & 🔍 RAG/知识库
+① 最热：[voicebox](https://github.com/jamiepine/voicebox)「开源语音合成」(+1162★/日)
+② 其他：[Kronos](https://github.com/shiyu-coder/Kronos)「金融基础模型」、[ragflow](https://github.com/infiniflow/ragflow)「RAG引擎」
+```
 
 ---
 
@@ -118,7 +131,18 @@ timeoutSeconds: 600
 
 ---
 
-## 7. 相关文件
+## 7. 已知问题修复历史
+
+| 日期 | 问题 | 修复 |
+|------|------|------|
+| 2026-04-15 | exec 输出截断（~50KB） | 新增 `--sections` 参数精确过滤 BLOCK |
+| 2026-04-15 | #编号残留 | 添加禁止编号硬约束 |
+| 2026-04-15 | "其他"项目无链接 | 明确要求所有项目必须有链接 |
+| 2026-04-15 | hermes-agent 重复显示 | 规则优化，合并小分类 |
+
+---
+
+## 8. 相关文件
 
 | 文件 | 路径 |
 |------|------|
