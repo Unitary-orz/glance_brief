@@ -12,7 +12,7 @@ description: >-
 
 ## 数据来源
 
-- **脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py --sections "ai-agents:3,6,7,8,13-19 ai-trending:6,7"`
+- **脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py --sections "ai-agents:2,5,6,7,13-18 ai-trending:6,7"`
 - **Feed：** https://duanyytop.github.io/agents-radar/feed.xml
 - **RSS 分区：**
   - `ai-agents`：OpenClaw 生态日报（13 个项目，119 个 blocks）
@@ -26,13 +26,13 @@ description: >-
 
 | Source | BLOCK | 内容 |
 |--------|-------|------|
-| ai-agents | 3 | 今日速览 |
-| ai-agents | 6 | 社区热点 |
-| ai-agents | 7 | Bug 与稳定性 |
-| ai-agents | 8 | 功能请求与路线图信号 |
-| ai-agents | 13-19 | 生态趋势（7条） |
-| ai-trending | 6 | 各维度热门项目（GitHub Trending） |
-| ai-trending | 7 | 趋势信号分析 |
+| ai-agents | 2 | 今日速览 |
+| ai-agents | 5 | 社区热点 |
+| ai-agents | 6 | Bug 与稳定性 |
+| ai-agents | 7 | 功能请求与路线图信号 |
+| ai-agents | 13-18 | 各项目活跃度对比、OpenClaw生态定位、技术方向、趋势信号（6条） |
+| ai-trending | 6 | 今日速览 |
+| ai-trending | 7 | 各维度热门项目（GitHub Trending） |
 
 输出规模：~23KB（13 blocks）
 
@@ -50,17 +50,17 @@ description: >-
 ```
 **📡 agents-radar 生态报告 | [日期]**
 ━━━━━━━━━━━━━━━━━━━━
-**🌐 Agents生态趋势**     ← 5条趋势（BLOCK 13-19），不含编号
+**🌐 Agents生态趋势**     ← BLOCK 13-18（6条），不含编号
 ━━━━━━━━━━━━━━━━━━━━
 **🦁 OpenClaw 专项**    ← OpenClaw 专项动态
-①📊 今日速览（BLOCK 3）
-②🔥 社区热点（BLOCK 6），不含编号
-③🐛 Bug与稳定性（BLOCK 7），不含编号
-④✨ 功能请求（BLOCK 8），不含编号
+①📊 今日速览（BLOCK 2）
+②🔥 社区热点（BLOCK 5），不含编号
+③🐛 Bug与稳定性（BLOCK 6），不含编号
+④✨ 功能请求（BLOCK 7），不含编号
 ━━━━━━━━━━━━━━━━━━━━
-**📈 开源趋势信号**       ← 3条趋势信号（BLOCK 7），不含编号
+**📈 开源趋势信号**       ← ai-trending BLOCK 6 今日速览
 ━━━━━━━━━━━━━━━━━━━━
-**🔥 开源热点项目**      ← GitHub Trending（BLOCK 6），按★/日分类
+**🔥 开源热点项目**      ← ai-trending BLOCK 7 各维度热门项目，按★/日分类
 ```
 
 ## 核心格式规则

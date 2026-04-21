@@ -17,7 +17,7 @@
 
 ## 1. 数据来源
 
-**脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py --sections "ai-agents:3,6,7,8,13-19 ai-trending:6,7"`
+**脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py --sections "ai-agents:2,5,6,7,13-18 ai-trending:6,7"`
 
 **Feed：** [agents-radar feed.xml](https://duanyytop.github.io/agents-radar/feed.xml)
 
@@ -30,13 +30,13 @@
 
 | Source | BLOCK | 内容 |
 |--------|-------|------|
-| ai-agents | 3 | 今日速览 |
-| ai-agents | 6 | 社区热点 |
-| ai-agents | 7 | Bug 与稳定性 |
-| ai-agents | 8 | 功能请求与路线图信号 |
-| ai-agents | 13-19 | 生态趋势（7条） |
-| ai-trending | 6 | 各维度热门项目（GitHub Trending） |
-| ai-trending | 7 | 趋势信号分析 |
+| ai-agents | 2 | 今日速览 |
+| ai-agents | 5 | 社区热点 |
+| ai-agents | 6 | Bug 与稳定性 |
+| ai-agents | 7 | 功能请求与路线图信号 |
+| ai-agents | 13-18 | 各项目活跃度/OpenClaw生态定位/技术方向/差异化/社区分层/趋势信号（6条） |
+| ai-trending | 6 | 今日速览 |
+| ai-trending | 7 | 各维度热门项目（GitHub Trending） |
 
 **输出规模：** ~23KB（13 blocks）vs 全量 ~50KB（128 blocks）
 
