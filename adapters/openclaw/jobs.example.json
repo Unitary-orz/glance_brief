@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "runtime": "openclaw",
+  "template": true,
+  "jobs": [
+    {
+      "name": "agents-report daily",
+      "schedule": "0 2 * * *",
+      "script": "skills/agents-report/scripts/agents_radar_prefetch.py",
+      "prompt_file": "skills/agents-report/prompts/agents-report-v2.md",
+      "model": "<model>",
+      "deliver": "<channel>"
+    },
+    {
+      "name": "noon-news",
+      "schedule": "30 4 * * *",
+      "script": "skills/noon-news/scripts/noon_news_prefetch.py",
+      "prompt_file": "skills/noon-news/prompts/news-brief-v2.md",
+      "model": "<model>",
+      "deliver": "<channel>"
+    }
+  ]
+}

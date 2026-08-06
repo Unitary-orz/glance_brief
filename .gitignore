@@ -2,8 +2,20 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
 dist/
 build/
+
+# Runtime output and private configuration
+.env
+.env.*
+!.env.example
+*.local.json
+runtime-data/
+output/
 
 # OS
 .DS_Store
@@ -14,6 +26,3 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
-# OpenClaw workspace specific (if any leaks)
-openclaw/

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "source_updated_at": "2026-08-06T00:00:00Z",
+  "points": [
+    {"model": "model-a", "effort": "high", "iq": 100, "average_minutes": 2.0, "average_price_usd": 0.02},
+    {"model": "model-b", "effort": "high", "iq": 80, "average_minutes": 1.0, "average_price_usd": 0.01}
+  ]
+}

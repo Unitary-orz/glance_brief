@@ -15,15 +15,22 @@ import sys
 import argparse
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
-FEED_URL = "https://duanyytop.github.io/agents-radar/feed.xml"
-OUTPUT_DIR = "/root/.openclaw/workspace-lionclaw/data/news"
-DEFAULT_TZ = "Asia/Shanghai"
+FEED_URL = os.environ.get(
+    "AGENTS_RADAR_FEED_URL",
+    "https://duanyytop.github.io/agents-radar/feed.xml",
+)
+OUTPUT_DIR = os.environ.get(
+    "AGENTS_RADAR_OUTPUT_DIR",
+    str(Path.home() / ".cache" / "glance-brief" / "agents-radar"),
+)
+DEFAULT_TZ = os.environ.get("BRIEF_TIMEZONE", "Asia/Shanghai")
 
 SOURCE_RULES = {
     "ai-agents": {
-        "label": "OpenClaw生态",
+        "label": "Agents生态",
         "match_tokens": ("ai-agents",),
     },
     "ai-cli": {
@@ -348,7 +355,11 @@ def main():
             parts.append(format_entry(source_id, entry))
 
     output = "\n\n".join(parts)
-    output_path = save_output(output, report_date)
+    try:
+        output_path = save_output(output, report_date)
+    except OSError as exc:
+        print(f"ERROR: cannot save agents-radar output: {exc}", file=sys.stderr)
+        return 1
     print(f"Output saved to: {output_path}")
     print(output)
     return 0

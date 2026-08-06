@@ -1,84 +1,72 @@
 ---
 name: agents-report
 description: >-
-  每日 OpenClaw 生态报告（agents-radar）定时任务 Skill。
-  抓取 agents-radar RSS，格式化后发送至配置的消息渠道。
-  使用时机：用户要求查看 OpenClaw 生态日报、Agents 趋势、GitHub Trending。
+  每日 AI / Agents 生态报告 Skill。
+  整合 agents-radar、AI HOT 和 CodexRadar 数据，输出 AI 生态动态、
+  模型效率和开源热点趋势。核心脚本可独立运行，定时投递由 runtime adapter 配置。
+triggers:
+  - agents-report
+  - agents-radar
+  - AI 开源雷达
+  - AI 生态日报
 ---
 
 # agents-report
 
-每日 OpenClaw 生态报告（agents-radar）。
+## 运行入口
+
+```bash
+python3 skills/agents-report/scripts/agents_radar_prefetch.py
+```
+
+脚本输出一个 `schema_version: 1` 的 JSON，供 Prompt 格式化。它不会发送消息。
+
+## 脚本
+
+- `agents_radar_prefetch.py`：Agents、AI HOT 和 CodexRadar 预取编排
+- `agents-radar-daily.py`：agents-radar RSS 原始采集器
+- `codexradar_efficiency.py`：CodexRadar 读取、排序和 Markdown 渲染
 
 ## 数据来源
 
-- **脚本：** `python3 skills/agents-report/scripts/agents-radar-daily.py --sections "ai-agents:2,5,6,7,13-18 ai-trending:6,7"`
-- **Feed：** https://duanyytop.github.io/agents-radar/feed.xml
-- **RSS 分区：**
-  - `ai-agents`：OpenClaw 生态日报（13 个项目，119 个 blocks）
-  - `ai-cli`：AI CLI 工具横向对比
-  - `ai-trending`：GitHub Trending 趋势（9 个 blocks）
+- agents-radar：`https://duanyytop.github.io/agents-radar/feed.xml`
+- AI HOT v1：`/api/v1/items?mode=selected&category=<slug>&window=24h&limit=20`
+- CodexRadar：公开 snapshot，失败时回退原始评测表
 
-## BLOCK 过滤说明
+## 配置
 
-全量输出（119+9 blocks）超过 exec 工具显示限制（~50KB），导致模型捏造内容。
-使用 `--sections` 参数精确过滤：
+复制：
 
-| Source | BLOCK | 内容 |
-|--------|-------|------|
-| ai-agents | 2 | 今日速览 |
-| ai-agents | 5 | 社区热点 |
-| ai-agents | 6 | Bug 与稳定性 |
-| ai-agents | 7 | 功能请求与路线图信号 |
-| ai-agents | 13-18 | 各项目活跃度对比、OpenClaw生态定位、技术方向、趋势信号（6条） |
-| ai-trending | 6 | 今日速览 |
-| ai-trending | 7 | 各维度热门项目（GitHub Trending） |
-
-输出规模：~23KB（13 blocks）
-
-## 硬约束
-
-**🚫 禁止出现任何 `#` 编号**（如 `#49971`、`PR #123`、`Issue #xxx`）
-**✅ 只保留纯文字描述**
-
-示例：
-- ❌ `#49971 RFC: 原生代理身份与信任验证`
-- ✅ `RFC 原生代理身份与信任验证`
-
-## 报告结构
-
-```
-**📡 agents-radar 生态报告 | [日期]**
-━━━━━━━━━━━━━━━━━━━━
-**🌐 Agents生态趋势**     ← BLOCK 13-18（6条），不含编号
-━━━━━━━━━━━━━━━━━━━━
-**🦁 OpenClaw 专项**    ← OpenClaw 专项动态
-①📊 今日速览（BLOCK 2）
-②🔥 社区热点（BLOCK 5），不含编号
-③🐛 Bug与稳定性（BLOCK 6），不含编号
-④✨ 功能请求（BLOCK 7），不含编号
-━━━━━━━━━━━━━━━━━━━━
-**📈 开源趋势信号**       ← ai-trending BLOCK 6 今日速览
-━━━━━━━━━━━━━━━━━━━━
-**🔥 开源热点项目**      ← ai-trending BLOCK 7 各维度热门项目，按★/日分类
+```text
+config/codexradar_watch.example.json
 ```
 
-## 核心格式规则
+为：
 
-**GitHub Trending 分类合并：**
-- ≥2 个 ★/日项目 → 独立分类
-- <2 个 ★/日项目 → 合并为「其他」
-- ★/日 仅标记原文有「+X today」的项目
+```text
+config/codexradar_watch.json
+```
 
-**OpenClaw 专项：**
-- 章节用顿号连接，不换行
-- 可选章节，无内容则省略
-- **禁止出现 `#` 编号**
+并通过 `CODEXRADAR_CONFIG` 指定。真实配置不要提交到公共仓库。
 
-## 定时任务配置
+## 输出规则
 
-参见 `INSTALL.md`。
+完整格式契约见：
 
-## 详细文档
+```text
+prompts/agents-report-v2.md
+```
 
-见 `references/agents-radar-daily-ops.md`
+当前固定板块为：
+
+1. `🤖 AI 生态动态`
+2. `🧠 CodexRadar 智力效率`
+3. `🔥 开源热点趋势`
+
+报告格式变更必须先更新 Prompt、输出契约和测试，不要只改运行时 Cron。
+
+## 失败处理
+
+- agents-radar 失败或正文选择失败：输出 `⚠️ agents-radar 报告获取失败，请检查网络`，不要用常识补齐。
+- AI HOT 某分类失败：只影响 AI 生态动态，仍可使用另一分类；证据不足时写“信息有限”。
+- CodexRadar 失败：原样使用脚本中的“信息有限”提示。

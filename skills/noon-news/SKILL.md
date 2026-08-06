@@ -1,88 +1,48 @@
 ---
 name: noon-news
 description: >-
-  每日午间热点简报定时任务 Skill。
-  综合多 news skills 输出「📰 今日热点简报」，发送至配置的消息渠道。
-  使用时机：用户要求查看今日新闻、热点简报、午间新闻。
+  每日午间热点简报 Skill。
+  预取多源新闻和 AI HOT 数据，按固定模板生成可追溯简报；
+  来源链接保持独立一行，不改变既有排版。
+triggers:
+  - noon-news
+  - 今日热点简报
+  - 午间新闻
+  - 今日新闻
 ---
 
 # noon-news
 
-每日午间热点简报（📰 今日热点简报）。
-
-## 简报风格特点
-
-- **事实驱动**：只写已发生的事实，不写推断或趋势判断
-- **克制精确**：标题即核心信息，正文不超过两句话
-- **来源可查**：每条消息附带来源标签（NS/NA/DA/HN）
-- **结构固定**：国际/宏观/科技，板块清晰
-
-## 数据来源（执行顺序）
-
-### 1. news-aggregator-skill（优先）
+## 运行入口
 
 ```bash
-python3 ~/.openclaw/skills/news-aggregator-skill/scripts/fetch_news.py \
-  --source hackernews,github,producthunt,36kr,tencent,weibo,wallstreetcn,v2ex --limit 8
+python3 skills/noon-news/scripts/noon_news_prefetch.py
 ```
 
-### 2. news-summary RSS（补充）
+脚本输出一个 `schema_version: 1` 的 JSON，供 Prompt 格式化。它不会发送消息。
 
-```bash
-# BBC World
-curl -s "https://feeds.bbci.co.uk/news/world/rss.xml" | ...
-# The Independent
-curl -s "https://www.independent.co.uk/rss" | ...
-# NPR
-curl -s "https://feeds.npr.org/1001/rss.xml" | ...
-# Al Jazeera
-curl -s "https://www.aljazeera.com/xml/rss/all.xml" | ...
+## 数据来源
+
+按当前配置预取：
+
+1. news-aggregator
+2. news-summary RSS
+3. AI HOT public API
+
+外部脚本通过环境变量指定，不写死 OpenClaw 或 Hermes 路径。
+
+## Prompt
+
+当前格式契约见：
+
+```text
+prompts/news-brief-v2.md
 ```
 
-### 3. daily-ai-news-skill（如可用）
+特别注意：每条来源链接必须保持独立一行；只增加链接时不得把来源并入事实描述，也不得顺手改动标题、章节或换行结构。
 
-仅在前两者失败或内容不足时 fallback 使用。
+## 失败处理
 
-### 4. 搜索补齐（如仍有缺口）
-
-仅当某个 skill 执行失败或返回为空时，才允许使用 `agent-reach` 搜索补齐。
-
-## 输出格式
-
-固定标题：**📰 今日热点简报**
-
-```
-## 📰 今日热点简报
-
-### 通用区域 General
-**① 国际要闻**
-  - **标题**
-    一句话事实描述。
-    `来源 NS·BBC`
-
-**② 宏观与商业**
-  ...
-
-### 科技区域 Tech
-**① AI 主线**
-  ...
-**② 平台与产品**
-  ...
-**③ 开发者与生态**
-  ...
-```
-
-## 写作约束
-
-- 每条最多两行：标题 + 事实句
-- 事实句不使用"预计/可能/或将/趋势"等推断词
-- 信息不足必须写：信息有限，待更多来源确认
-- 每条都带来源标签（NS/NA/DA/HN）
-
-## 定时任务配置
-
-参见 `INSTALL.md`。
-
-## 详细文档
-
-见 `references/noon-news-task.md`
+- 单个来源失败：保留其他可用来源，并在数据中保留失败状态。
+- 所有来源失败：输出固定失败提示。
+- 内容不足：少报或省略，不用无关来源凑数。

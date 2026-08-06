@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "news_aggregator": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "",
+    "items": [
+      {"title": "Example headline", "url": "https://example.com/news"}
+    ]
+  },
+  "rss_summary": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "",
+    "items": [
+      {"title": "Example RSS", "link": "https://example.com/rss"}
+    ]
+  },
+  "aihot": {
+    "ok": true,
+    "items": [
+      {"title": "Example AI", "links": {"aihot": "https://example.com/ai"}}
+    ],
+    "count": 1,
+    "since": "2026-08-06T00:00:00Z",
+    "take": 20,
+    "endpoint": "https://example.com/api/public/items?mode=selected&since=2026-08-06T00:00:00Z&take=20"
+  },
+  "instructions": {
+    "source_first": "Use only fetched source data.",
+    "format": "Feishu markdown: list items use '- '.",
+    "ai_section": "Prefer aihot.items; use the documented fallback only when needed."
+  }
+}

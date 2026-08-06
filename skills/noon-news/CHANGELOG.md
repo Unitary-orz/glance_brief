@@ -1,13 +1,9 @@
-# Changelog
+# noon-news changelog
 
-All notable changes to this project will be documented in this file.
+## 0.1.0
 
-## [1.0.0] - 2026-04-13
-
-### Added
-- Initial release
-- `noon-news` skill: daily noon news brief
-- Multi-source news aggregation (news-aggregator → news-summary RSS → daily-ai-news → agent-reach fallback)
-- Fixed format: 📰 今日热点简报
-- Briefing style: fact-driven, source-tagged, structure-fixed
-- Writing constraints: no speculation, max two lines per item
+- Synced the current news, RSS, and AI HOT prefetch pipeline.
+- Added the current `今日要点` and `分类详情` structure.
+- Preserved the independent source-link line layout.
+- Added runtime-independent external script paths.
+- Converts AI HOT curl startup failures into structured JSON source failures.

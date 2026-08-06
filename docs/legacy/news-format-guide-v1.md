@@ -2,7 +2,7 @@
 
 > 本文档定义各类 News 报告的通用格式规范与内容约束。
 >
-> **文档状态：** 现行有效
+> **文档状态：** 历史归档；当前有效规则见 [`docs/output-contracts.md`](../../docs/output-contracts.md) 和 `skills/noon-news/prompts/news-brief-v2.md`
 > **创建日期：** 2026-04-13
 > **最近更新：** 2026-04-13
 

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "enabled": true,
+  "source": {
+    "snapshot_url": "https://codexradar.com/data/intelligence-efficiency.json",
+    "raw_url": "https://codexradar.com/api/intelligence-efficiency",
+    "metrics_url": "https://codexradar.com/api/intelligence-efficiency-metrics"
+  },
+  "metrics": [
+    "iq",
+    "average_minutes",
+    "average_price_usd"
+  ],
+  "selection": {
+    "iq_filter": {
+      "enabled": false,
+      "include_iq_at_least": 90
+    },
+    "explicit": [
+      {
+        "model": "gpt-5.6-luna",
+        "efforts": [
+          "xhigh",
+          "max"
+        ]
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "min_effort": "medium"
+      },
+      {
+        "model": "deepseek-v4-flash",
+        "efforts": "all_available"
+      },
+      {
+        "model": "gpt-5.5",
+        "efforts": "all_available"
+      }
+    ]
+  },
+  "ranking": {
+    "intelligence_top_n": 2,
+    "value_top_n": 3,
+    "value_scope": "non_sol_explicit_watch_configs",
+    "value_method": "iq_price_ratio_with_iq_floor",
+    "value_iq_floor": 70,
+    "value_ratio_metric": "iq_per_average_price_usd",
+    "balanced_top_n": 2,
+    "balanced_scope": "all_explicit_watch_configs",
+    "balanced_method": "geometric_mean_percentile_iq_time_price",
+    "balanced_weights": {
+      "iq": 1,
+      "average_minutes": 1,
+      "average_price_usd": 1
+    },
+    "balanced_tie_break": "lower_combined_cost",
+    "other_sort": {
+      "method": "model_order_then_effort_order",
+      "model_order": [
+        "gpt-5.6-sol",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "effort_order": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra"
+  ],
+  "model_aliases": {
+    "luna": "gpt-5.6-luna",
+    "sol": "gpt-5.6-sol",
+    "dp v4": "deepseek-v4-flash",
+    "deepseek v4": "deepseek-v4-flash",
+    "deepseek-v4": "deepseek-v4-flash"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "page": {"count": 2, "hasMore": false},
+  "items": [
+    {
+      "title": "Agents orchestration update",
+      "summary": "A source-backed AI agents update.",
+      "source": {"name": "Example Source"},
+      "links": {"aihot": "https://example.com/aihot/agents"}
+    },
+    {
+      "title": "Research paper on tool use",
+      "summary": "A source-backed paper item.",
+      "source": {"name": "Example Paper"},
+      "links": {"aihot": "https://example.com/aihot/paper"}
+    }
+  ]
+}
