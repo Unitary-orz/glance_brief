@@ -8,6 +8,9 @@ This directory describes the runtime boundary for OpenClaw. The business scripts
 export CODEXRADAR_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/codexradar_watch.json"
 export AGENTS_RADAR_OUTPUT_DIR="$OPENCLAW_WORKSPACE/data/brief/output/agents-radar"
 export AGENTS_RADAR_COLLECTOR="$OPENCLAW_WORKSPACE/skills/agents-report/scripts/agents-radar-daily.py"
+export AGENTS_RADAR_QUALITY_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/agents_radar_quality.json"
+export AGENTS_RADAR_QUALITY_MODULE_DIR="$OPENCLAW_WORKSPACE/skills/agents-report/scripts"
+export AGENTS_RADAR_CRON_OUTPUT_DIR="$OPENCLAW_WORKSPACE/cron/output/<agents-report-job-id>"
 export NEWS_AGGREGATOR_SCRIPT="$OPENCLAW_WORKSPACE/skills/news-aggregator-skill/scripts/fetch_news.py"
 export NEWS_SUMMARY_SCRIPT="$OPENCLAW_WORKSPACE/skills/news-summary/scripts/fetch_rss.py"
 ```

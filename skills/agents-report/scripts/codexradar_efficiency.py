@@ -262,6 +262,9 @@ def rank_value(points: list[dict[str, Any]], ranking: dict[str, Any], config: di
     scope = ranking.get("value_scope", "all_explicit_watch_configs")
     candidates = [point for point in points if point["model"] != "gpt-5.6-sol"] if scope == "non_sol_explicit_watch_configs" else list(points)
     if not candidates:
+        # A restricted non-Sol ranking must not silently re-introduce Sol.
+        if scope == "non_sol_explicit_watch_configs":
+            return []
         candidates = list(points)
 
     floor = as_float(ranking.get("value_iq_floor"))
@@ -270,14 +273,23 @@ def rank_value(points: list[dict[str, Any]], ranking: dict[str, Any], config: di
     if not candidates:
         return []
 
+    price_exponent = as_float(ranking.get("value_price_exponent"))
+    if price_exponent is None or price_exponent <= 0:
+        price_exponent = 0.25
+
     scored = []
     for point in candidates:
         item = dict(point)
-        item["value_score"] = point["iq"] / max(point["price"], 0.000001)
+        price = point["price"]
+        item["value_is_free"] = price == 0
+        item["value_score"] = (
+            None if item["value_is_free"] else point["iq"] / price ** price_exponent
+        )
         scored.append(item)
     scored.sort(
         key=lambda p: (
-            -p["value_score"],
+            0 if p["value_is_free"] else 1,
+            -(p["value_score"] or 0),
             -p["iq"],
             p["combined_cost"],
             p["minutes"],

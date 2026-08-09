@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- 回灌生产版 CodexRadar 性价比公式：按 `IQ / price^0.25` 排序，阻止非 Sol 榜单回退到 Sol，并确保免费配置仍输出标准 JSON。
+- 保留 agents-radar 来源中的 HTTP(S) Markdown 锚点；最终项目检查默认只接受 `https://github.com/` 前缀，并拒绝其他协议或仓库前缀。
+- 将 `agents_radar.open_source_quality` 纳入数据契约，并补充报告首行、项目链接和数量检查。
+- 收敛来源与事实边界：单来源不凑数；来源明确的预测保留预测属性，禁止模型自行推演。
+- 保持当前报告标题、章节顺序、来源行位置和可见版式不变。
+
 ## 0.1.0 — 2026-08-06
 
 首次建立可复用的开源项目基线：

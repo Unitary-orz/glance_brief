@@ -1,0 +1,6 @@
+{
+  "other_projects_max": 4,
+  "cron_output_dir": "/path/to/cron/output/agents-report",
+  "project_link_prefix": "https://github.com/",
+  "description": "agents-radar report quality rules"
+}

@@ -5,6 +5,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -68,6 +69,35 @@ class AdapterTests(unittest.TestCase):
             self.assertTrue((ROOT / job["script"]).is_file(), job["script"])
             self.assertTrue((ROOT / job["prompt_file"]).is_file(), job["prompt_file"])
 
+    def test_private_skill_configs_are_gitignored(self):
+        for relative in (
+            "skills/agents-report/config/codexradar_watch.json",
+            "skills/agents-report/config/agents_radar_quality.json",
+        ):
+            result = subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    f"safe.directory={ROOT}",
+                    "check-ignore",
+                    "--no-index",
+                    "-q",
+                    relative,
+                ],
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, relative)
+
+    def test_both_runtime_adapters_document_quality_paths(self):
+        for relative in (
+            "adapters/hermes/INSTALL.md",
+            "adapters/openclaw/INSTALL.md",
+        ):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("AGENTS_RADAR_QUALITY_CONFIG", text, relative)
+            self.assertIn("AGENTS_RADAR_QUALITY_MODULE_DIR", text, relative)
+
 
 class AgentsRadarTests(unittest.TestCase):
     def test_collector_uses_feed_date_from_link(self):
@@ -80,6 +110,25 @@ class AgentsRadarTests(unittest.TestCase):
         blocks = agents_collector.split_blocks(text)
         self.assertEqual(len(blocks), 2)
         self.assertEqual(agents_collector.infer_block_title(blocks[0]), "Trend")
+
+    def test_collector_preserves_github_anchor_as_markdown(self):
+        text = agents_collector.strip_html(
+            '<a class="repo" href="https://github.com/example/project">'
+            "example/project</a>"
+        )
+        self.assertEqual(
+            text,
+            "[example/project](https://github.com/example/project)",
+        )
+
+    def test_collector_drops_non_http_anchor_target(self):
+        text = agents_collector.strip_html(
+            '<a href="javascript:alert(1)">unsafe label</a>'
+        )
+        self.assertEqual(text, "unsafe label")
+
+    def test_prefetch_defaults_quality_module_to_script_directory(self):
+        self.assertEqual(agents_prefetch.QUALITY_MODULE_DIR, AGENTS_SCRIPTS)
 
     def test_prefetch_selects_content_markers_not_fixed_block_numbers(self):
         raw = """
@@ -116,6 +165,73 @@ class CodexRadarTests(unittest.TestCase):
         ranked = codexradar.rank_value(data, ranking, config)
         self.assertEqual(ranked[0]["model"], "model-a")
         self.assertEqual(len(ranked), 1)
+
+    def test_rank_value_uses_sublinear_price_penalty(self):
+        data = [
+            {
+                "model": "quality-model",
+                "effort": "high",
+                "iq": 100.0,
+                "price": 4.0,
+                "minutes": 10.0,
+                "combined_cost": 14.0,
+            },
+            {
+                "model": "cheap-model",
+                "effort": "high",
+                "iq": 80.0,
+                "price": 2.0,
+                "minutes": 10.0,
+                "combined_cost": 12.0,
+            },
+        ]
+        ranking = {"value_top_n": 2, "value_price_exponent": 0.25}
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        ranked = codexradar.rank_value(data, ranking, config)
+        self.assertEqual(ranked[0]["model"], "quality-model")
+
+    def test_restricted_value_scope_does_not_fallback_to_sol(self):
+        data = [
+            {
+                "model": "gpt-5.6-sol",
+                "effort": "high",
+                "iq": 100.0,
+                "price": 4.0,
+                "minutes": 10.0,
+                "combined_cost": 14.0,
+            }
+        ]
+        ranking = {
+            "value_top_n": 3,
+            "value_scope": "non_sol_explicit_watch_configs",
+        }
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        self.assertEqual(codexradar.rank_value(data, ranking, config), [])
+
+    def test_free_value_candidate_remains_strict_json(self):
+        data = [
+            {
+                "model": "free-model",
+                "effort": "high",
+                "iq": 80.0,
+                "price": 0.0,
+                "minutes": 10.0,
+                "combined_cost": 10.0,
+            },
+            {
+                "model": "paid-model",
+                "effort": "high",
+                "iq": 100.0,
+                "price": 1.0,
+                "minutes": 10.0,
+                "combined_cost": 11.0,
+            },
+        ]
+        ranking = {"value_top_n": 2, "value_price_exponent": 0.25}
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        ranked = codexradar.rank_value(data, ranking, config)
+        self.assertEqual(ranked[0]["model"], "free-model")
+        json.dumps(ranked, allow_nan=False)
 
     def test_missing_codexradar_timestamp_is_explicit_warning(self):
         config = {
@@ -193,8 +309,9 @@ class NoonNewsTests(unittest.TestCase):
 
     def test_prompt_keeps_source_on_separate_line(self):
         prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
-        self.assertIn("来源必须是独立行", prompt)
-        self.assertIn("来源：[NS](原文链接)", prompt)
+        self.assertIn("来源：[NS](原文链接) · [BBC](原文链接)", prompt)
+        self.assertIn("来源 URL 使用脚本原始条目的 `link` 或 `url`", prompt)
+        self.assertIn("来源链接文本使用渠道简写", prompt)
         self.assertIn("严格输出 4–5 条编号列表", prompt)
         self.assertIn("主题词为 2–6 个中文字符", prompt)
         self.assertNotIn("事实描述。（来源", prompt)
@@ -208,6 +325,166 @@ class OutputContractTests(unittest.TestCase):
         self.assertIn("不超过 140 字", prompt)
         self.assertIn("热门项目", prompt)
         self.assertIn("其他项目", prompt)
+
+    def test_agents_prompt_uses_available_sources_without_padding(self):
+        prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
+        self.assertIn("1–3 个真实相关来源", prompt)
+        self.assertIn("只有一个来源时直接使用一个", prompt)
+        self.assertNotIn("🌐 Agents生态趋势", prompt)
+
+    def test_noon_prompt_allows_only_source_supported_forecasts(self):
+        prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
+        self.assertIn("允许原始来源明确给出的预测、预警和条件判断", prompt)
+        self.assertIn("禁止模型自行推演", prompt)
+
+    def test_quality_checker_rejects_preface_and_ignores_sentence_as_category(self):
+        quality = load_module(
+            "open_source_quality",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        source = """
+“从零复现大模型”类项目（alpha、beta）依旧活跃。
+🔧 AI 基础工具（框架、SDK）
+| [example/project](https://github.com/example/project)
+"""
+        inspected = quality.inspect_source_projects(source)
+        self.assertEqual(
+            [category["name"] for category in inspected["categories"]],
+            ["🔧 AI 基础工具（框架、SDK）"],
+        )
+
+        report = """
+All context confirmed.
+
+📡 **agents-radar 生态报告 | 2026-08-09**
+
+**🔥 开源热点趋势**
+
+🔧 AI 基础工具
+- 热门项目：[example/project](https://github.com/example/project)「简介」
+- 其他项目：无
+"""
+        checked = quality.validate_rendered_report(report)
+        self.assertFalse(checked["ok"])
+        self.assertIn(
+            "report_preface_present",
+            [warning["code"] for warning in checked["warnings"]],
+        )
+
+    def test_quality_parser_accepts_list_projects_and_plain_emoji_category(self):
+        quality = load_module(
+            "open_source_quality_list_fixture",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        source = """
+🔧 AI 基础工具
+- [example/linked](https://github.com/example/linked)
+- example/unlinked
+"""
+        inspected = quality.inspect_source_projects(source)
+        self.assertEqual(inspected["source_project_count"], 2)
+        self.assertEqual(inspected["source_linked_project_count"], 1)
+        self.assertEqual(inspected["source_unlinked_projects"], ["example/unlinked"])
+        self.assertEqual(inspected["categories"][0]["name"], "🔧 AI 基础工具")
+
+    def test_quality_parser_omits_empty_section_heading_category(self):
+        quality = load_module(
+            "open_source_quality_section_heading",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        source = """
+🔥 开源热点趋势
+🔧 AI 基础工具
+| [example/linked](https://github.com/example/linked)
+"""
+        inspected = quality.inspect_source_projects(source)
+        self.assertEqual(
+            [category["name"] for category in inspected["categories"]],
+            ["🔧 AI 基础工具"],
+        )
+
+    def test_quality_config_environment_overrides_example_output_path(self):
+        quality = load_module(
+            "open_source_quality_env_override",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "quality.json"
+            config_path.write_text(
+                json.dumps({"cron_output_dir": "/path/to/example"}),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                "os.environ",
+                {"AGENTS_RADAR_CRON_OUTPUT_DIR": "/runtime/cron/output"},
+            ):
+                config = quality.load_quality_config(config_path)
+        self.assertEqual(config["cron_output_dir"], "/runtime/cron/output")
+
+    def test_quality_checker_requires_configured_project_link_prefix(self):
+        quality = load_module(
+            "open_source_quality_link_prefix",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        report = """
+📡 **agents-radar 生态报告 | 2026-08-09**
+
+**🔥 开源热点趋势**
+
+🔧 AI 基础工具
+- 热门项目：[example/project](https://example.com/example/project)「简介」
+- 其他项目：无
+"""
+        rules = quality.load_quality_config()
+        checked = quality.validate_rendered_report(report, rules)
+        self.assertFalse(checked["ok"])
+        self.assertIn(
+            "rendered_project_links_invalid",
+            [warning["code"] for warning in checked["warnings"]],
+        )
+
+        custom_rules = dict(rules)
+        custom_rules["project_link_prefix"] = "https://git.example/"
+        custom_report = report.replace(
+            "https://example.com/example/project",
+            "https://git.example/example/project",
+        )
+        custom_checked = quality.validate_rendered_report(
+            custom_report,
+            custom_rules,
+        )
+        self.assertTrue(custom_checked["ok"], custom_checked["warnings"])
+
+    def test_quality_checker_rejects_mixed_non_http_project_links(self):
+        quality = load_module(
+            "open_source_quality_mixed_schemes",
+            AGENTS_SCRIPTS / "open_source_quality.py",
+        )
+        source = """
+🔧 AI 基础工具
+- [example/valid](https://github.com/example/valid)
+- [example/ftp](ftp://github.com/example/ftp)
+"""
+        inspected = quality.inspect_source_projects(source)
+        self.assertFalse(inspected["ok"])
+        self.assertEqual(inspected["source_project_count"], 2)
+        self.assertEqual(inspected["source_unlinked_projects"], ["example/ftp"])
+
+        report = """
+📡 **agents-radar 生态报告 | 2026-08-09**
+
+**🔥 开源热点趋势**
+
+🔧 AI 基础工具
+- 热门项目：[example/one](https://github.com/example/one)
+- 其他项目：[example/two](https://github.com/example/two)、[example/three](https://github.com/example/three)、[example/ftp](ftp://github.com/example/ftp)
+"""
+        checked = quality.validate_rendered_report(report)
+        self.assertFalse(checked["ok"])
+        self.assertIn(
+            "rendered_project_links_invalid",
+            [warning["code"] for warning in checked["warnings"]],
+        )
 
     def test_codex_heading_is_not_a_duplicate_output_line(self):
         prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")

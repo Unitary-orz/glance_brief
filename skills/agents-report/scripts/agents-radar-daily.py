@@ -112,7 +112,20 @@ def strip_html(text):
         return ""
     text = re.sub(r"<br\s*/?>", "\n", text)
     text = re.sub(r"<hr\s*/?>", "\n__HR__\n", text)
-    text = re.sub(r'<a href="[^"]+">([^<]+)</a>', r"\1", text)
+    def preserve_anchor(match):
+        href = html.unescape(match.group(1).strip())
+        label = re.sub(r"<[^>]+>", "", match.group(2))
+        label = html.unescape(label).strip()
+        if not re.match(r"^https?://", href, flags=re.IGNORECASE):
+            return label
+        return f"[{label}]({href})" if label else ""
+
+    text = re.sub(
+        r"<a\b[^>]*\bhref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
+        preserve_anchor,
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     text = re.sub(r"<tr>", "\n", text)
     text = re.sub(r"</tr>", "", text)
     text = re.sub(r"<t[dh][^>]*>", " | ", text)

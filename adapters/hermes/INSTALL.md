@@ -8,6 +8,9 @@ This directory describes how to connect the project to Hermes Cron. The example 
 export CODEXRADAR_CONFIG="$HOME/.hermes/data/brief/config/codexradar_watch.json"
 export AGENTS_RADAR_OUTPUT_DIR="$HOME/.hermes/data/brief/output/agents-radar"
 export AGENTS_RADAR_COLLECTOR="$HOME/.hermes/skills/agents-radar/scripts/agents-radar-daily.py"
+export AGENTS_RADAR_QUALITY_CONFIG="$HOME/.hermes/data/brief/config/agents_radar_quality.json"
+export AGENTS_RADAR_QUALITY_MODULE_DIR="$HOME/.hermes/skills/agents-radar/scripts"
+export AGENTS_RADAR_CRON_OUTPUT_DIR="$HOME/.hermes/cron/output/<agents-report-job-id>"
 export NEWS_AGGREGATOR_SCRIPT="$HOME/.hermes/skills/news-aggregator-skill/scripts/fetch_news.py"
 export NEWS_SUMMARY_SCRIPT="$HOME/.hermes/skills/news-summary/scripts/fetch_rss.py"
 ```
@@ -31,3 +34,5 @@ The reference local tasks are:
 - noon-news: `30 4 * * *` UTC, equivalent to 12:30 Asia/Shanghai
 
 Set the actual model and delivery target in the local Hermes job configuration. Do not commit them here.
+
+Hermes schedules are interpreted using the scheduler's configured/default timezone. The examples above are deliberately expressed in UTC; if you use local-time cron expressions, set the scheduler timezone explicitly instead of relying on the host timezone.

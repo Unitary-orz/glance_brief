@@ -26,6 +26,8 @@ python3 skills/agents-report/scripts/agents_radar_prefetch.py
 - `agents_radar_prefetch.py`：Agents、AI HOT 和 CodexRadar 预取编排
 - `agents-radar-daily.py`：agents-radar RSS 原始采集器
 - `codexradar_efficiency.py`：CodexRadar 读取、排序和 Markdown 渲染
+- `open_source_quality.py`：离线检查来源项目链接、分类和数量约束
+- `agents_radar_quality_check.py`：检查来源文本或最终 Markdown 报告
 
 ## 数据来源
 
@@ -39,15 +41,17 @@ python3 skills/agents-report/scripts/agents_radar_prefetch.py
 
 ```text
 config/codexradar_watch.example.json
+config/agents_radar_quality.example.json
 ```
 
 为：
 
 ```text
 config/codexradar_watch.json
+config/agents_radar_quality.json
 ```
 
-并通过 `CODEXRADAR_CONFIG` 指定。真实配置不要提交到公共仓库。
+分别通过 `CODEXRADAR_CONFIG` 和 `AGENTS_RADAR_QUALITY_CONFIG` 指定。真实配置不要提交到公共仓库。
 
 ## 输出规则
 
