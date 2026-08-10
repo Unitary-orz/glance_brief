@@ -319,12 +319,19 @@ class NoonNewsTests(unittest.TestCase):
 
     def test_prompt_keeps_source_on_separate_line(self):
         prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
-        self.assertIn("来源：[NS](原文链接) · [BBC](原文链接)", prompt)
-        self.assertIn("来源 URL 使用脚本原始条目的 `link` 或 `url`", prompt)
-        self.assertIn("来源链接文本使用渠道简写", prompt)
+        self.assertIn("> 来源：[NS•AlJazeera](原文链接)•[BBC](原文链接)", prompt)
+        self.assertIn("来源单独一行，用引用块（`> 来源：`）", prompt)
+        self.assertIn("正文不显示 URL 明文", prompt)
+        self.assertIn("冒号一律替换为 `•`", prompt)
+        self.assertIn("`公众号` 统一替换为 `WX`", prompt)
+        self.assertIn("最多 2 个渠道", prompt)
+        self.assertIn("+N", prompt)
+        self.assertIn("同渠道去重", prompt)
+        self.assertIn("链接使用脚本原始条目的 `link` 或 `url`", prompt)
         self.assertIn("严格输出 4–5 条编号列表", prompt)
         self.assertIn("主题词为 2–6 个中文字符", prompt)
         self.assertNotIn("事实描述。（来源", prompt)
+        self.assertNotIn("[NS](原文链接) · [BBC](原文链接)", prompt)
 
 
 class OutputContractTests(unittest.TestCase):

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2 — 2026-08-10
+
+午间简报（noon-news）来源样式优化：
+
+- 来源不再独立成行或并入事实句，改为单独一行引用块（`> 来源：`）呈现；链接以 Markdown 嵌入，正文不显示 URL 明文。
+- 所有来源统一用 `•` 连接；同渠道去重（渠道只写一次，媒体 `•` 连接）。
+- 每条新闻最多 2 个渠道，来源渠道超过 2 个时只保留前 2 个并在行末加 `+N`。
+- 来源链接文字内冒号一律替换为 `•`（内容保留，如 `X：Boris Cherny` → `X•Boris Cherny`）；`公众号` 统一替换为 `WX`。
+- 同步更新 `news-brief-v2.md`、`docs/output-contracts.md`、`skills/noon-news/SKILL.md` 与契约测试。
+
 ## 0.2.1 — 2026-08-10
 
 - 新增 `install/install.py doctor`：组件完整性检查（入口、lib 哈希、配置），面向安装/更新 Agent，输出按组件分组；状态分 `ok` / `warn`（可选提示）/ `error`（安装损坏），仅存在 `error` 时退出码为 1。
