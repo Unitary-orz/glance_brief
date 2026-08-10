@@ -10,62 +10,39 @@
 
 面向想持续关注 AI 行业的人，聚合 AI 与 Agents 生态动态、论文、开源热点和模型效率信息，按「AI 生态动态 → 模型效率 → 开源热点趋势」的顺序呈现，适合快速了解行业变化和值得继续追踪的方向。
 
+![agents-report 最终样式](docs/images/report-style-1.png)
+
 [查看 agents-report 安装说明](skills/agents-report/INSTALL.md)
 
 ### `noon-news`：午间热点简报
 
 面向想快速了解当天新闻的人，先给出 4–5 条今日要点，再按国际、商业、AI 等主题展开分类详情。每条新闻保留原始来源，方便直接点开继续阅读。
 
+![noon-news 最终样式](docs/images/report-style-2.png)
+
 [查看 noon-news 安装说明](skills/noon-news/INSTALL.md)
 
-## 最终样式
+## 内容治理规则
 
-两份日报采用同一种阅读节奏：**先看结论，再按主题展开，最后核对来源。**
+两份日报采用同一种阅读节奏：**先看结论，再按主题展开，最后核对来源。** 具体渲染以"两份日报"的示例图为准。
 
-午间热点简报：
+采纳的第三方模块与最终输出板块：
 
-```text
-📰 今日热点简报
+| 第三方模块 | 输出板块 |
+|---|---|
+| AI HOT（行业 / 论文 / public 精选） | agents-report · 🤖 AI 生态动态；noon-news · AI 主题 |
+| CodexRadar 效率快照 | agents-report · 🧠 CodexRadar 智力效率 |
+| agents-radar 生态日报（ai-trending） | agents-report · 🔥 开源热点趋势 |
+| news-aggregator-skill（HN / GitHub / 36Kr / 微博等 8 源） | noon-news · 今日要点 + 分类详情 |
+| news-summary RSS（国际源） | noon-news · 分类详情 |
 
-### 今日要点
-1. 主题词：一句话事实。
-2. 主题词：一句话事实。
+来源与样式规则：
 
-### 分类详情
-**① 国际要闻**
-- English Title
-  （中文短题）
-  一句话事实描述。
-  来源：[NS](原文链接) · [BBC](原文链接)
-```
-
-AI / Agents 生态日报：
-
-```text
-📡 agents-radar 生态报告 | 日期
-
-**🤖 AI 生态动态**
-- ① 一句话动态（来源：[短标签](原文链接)）
-
----
-
-**🧠 CodexRadar 智力效率**
-- ① 智力Top2：模型与指标
-- ② 均衡Top2：模型与指标
-- ③ 性价比Top3：模型与指标
-
----
-
-**🔥 开源热点趋势**
-- ① 总体趋势
-- ② 总体趋势
-
-项目分类
-- 热门项目：...
-- 其他项目：...
-```
-
-示例中的文字和链接仅用于说明版式；实际日报使用当天内容和真实来源。
+| 方面 | 规则 |
+|---|---|
+| 来源 | 每条内容保留真实原文链接；来源标注 2–8 字；只有一个来源时不凑数 |
+| 事实边界 | 只写原文可核对的内容；信息不足明确说明，不编造；预测保留预测属性，禁止模型自行推演 |
+| 版式 | 要点用列表行；分类标题独立一行不使用列表符号；板块之间用 `---` 分隔；CodexRadar 由脚本渲染、原样插入，Prompt 不重算 |
 
 ## 开始使用
 
@@ -102,23 +79,13 @@ python -m pip install -r requirements.txt
 
 如果只想在本地检查数据，也可以直接运行对应入口；它会输出结构化结果，不会自行发送消息。
 
-## 给维护者和开发者
+## 下一步计划
 
-- [架构说明](docs/architecture.md)：项目如何组织和运行；
-- [数据契约](docs/data-contracts.md)：数据字段和失败规则；
-- [输出契约](docs/output-contracts.md)：日报版式和来源要求。
-
-本地检查：
-
-```bash
-python3 -m py_compile \
-  skills/agents-report/scripts/*.py \
-  skills/noon-news/scripts/*.py
-
-python3 -m unittest discover -s tests -p 'test_*.py'
-```
-
-当前项目版本是 **0.1.0**；Prompt 版本为 `agents-report-v2` 和 `news-brief-v2`；预取数据协议为 `schema_version: 1`。
+- [ ] 可插拔来源适配器：将现有来源接入统一的「来源 → 标准化数据 → 板块编排 → 输出契约」接口，新增来源不改报告逻辑
+- [ ] 来源注册表与健康检查：新来源即插即用，`verify` 自动检查来源可用性
+- [ ] 板块映射配置化：通过配置文件声明「来源 → 板块」的对应关系，无需改代码即可接入新来源
+- [ ] 扩大优质来源：优先补充 arXiv 论文、X / 微博话题、YouTube 摘要等高质量内容源
+- [ ] 补充其他 runtime 适配：复用同一安装契约，支持 OpenClaw 等运行时
 
 ## 许可证
 
