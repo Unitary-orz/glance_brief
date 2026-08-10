@@ -85,6 +85,15 @@ python -m pip install -r requirements.txt
 - [ ] 扩大优质来源：优先补充 arXiv 论文、X / 微博话题、YouTube 摘要等高质量内容源
 - [ ] 补充其他 runtime 适配：复用同一安装契约，支持 OpenClaw 等运行时
 
+## 致谢
+
+信息源相关开源项目：
+
+- [news-aggregator-skill](https://github.com/cclank/news-aggregator-skill) — 新闻聚合来源
+- [AI HOT](https://aihot.virxact.com/)（skill 开源合集见 [khazix-skills](https://github.com/KKKKhazix/khazix-skills)）— AI 动态与日报来源
+- [agents-radar](https://github.com/duanyytop/agents-radar) — AI 生态日报与开源热点来源
+- [CodexRadar](https://codexradar.com/) — 模型效率快照来源
+
 ## 许可证
 
 MIT License
