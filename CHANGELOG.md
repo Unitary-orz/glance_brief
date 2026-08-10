@@ -1,7 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-08-10
 
+新增 Agent 安装链路，把"安装"从开发环境初始化收敛为可幂等执行、可验证、可卸载的正式流程：
+
+- 新增根目录 `INSTALL.md`：面向 Agent 的安装契约（发现 → 询问 → 确认 → 执行 → 验证），明确安装/更新/卸载语义与不破坏的不变量。
+- 新增 `install/install.py`（仅标准库）：`install` / `verify` / `uninstall` 三个动作；安装幂等，重复执行即更新项目文件并保留用户配置；卸载只删除 manifest 拥有物并报告待摘除的 Cron 任务。
+- 新增 `install/install-manifest.json`：组件、外部依赖与 Hermes 运行时路径声明。
+- 修正 `adapters/hermes/INSTALL.md` 与 `jobs.example.json`：任务脚本路径改为运行时相对路径（`glance-brief/*.py`），去掉 `data/brief` 和外部 agents-radar 目录假设。
+- README 与两个 Skill 安装说明增加"使用 Agent 安装（推荐）"入口，手工安装降为备选。
+- 更新 Hermes 示例任务契约测试：校验任务脚本格式与安装清单声明一致。
 - 回灌生产版 CodexRadar 性价比公式：按 `IQ / price^0.25` 排序，阻止非 Sol 榜单回退到 Sol，并确保免费配置仍输出标准 JSON。
 - 保留 agents-radar 来源中的 HTTP(S) Markdown 锚点；最终项目检查默认只接受 `https://github.com/` 前缀，并拒绝其他协议或仓库前缀。
 - 将 `agents_radar.open_source_quality` 纳入数据契约，并补充报告首行、项目链接和数量检查。

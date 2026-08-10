@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "project": "glance_brief",
+  "python_deps": ["feedparser>=6.0,<7"],
+  "external_skills": {
+    "news-aggregator-skill": {
+      "expected_script": "scripts/fetch_news.py",
+      "source_hint": "Hermes skill (news-aggregator-skill); provide its install source when missing"
+    },
+    "news-summary": {
+      "expected_script": "scripts/fetch_rss.py",
+      "source_hint": "Hermes skill (news-summary); provide its install source when missing"
+    }
+  },
+  "components": {
+    "agents-report": {
+      "description": "AI / Agents ecosystem daily report",
+      "lib_source": "skills/agents-report/scripts",
+      "prompt": "skills/agents-report/prompts/agents-report-v2.md",
+      "entrypoint": "agents-report.py",
+      "default_schedule": "0 2 * * *",
+      "config_templates": {
+        "codexradar_watch.json": "skills/agents-report/config/codexradar_watch.example.json",
+        "agents_radar_quality.json": "skills/agents-report/config/agents_radar_quality.example.json"
+      }
+    },
+    "noon-news": {
+      "description": "Midday news briefing",
+      "lib_source": "skills/noon-news/scripts",
+      "prompt": "skills/noon-news/prompts/news-brief-v2.md",
+      "entrypoint": "noon-news.py",
+      "default_schedule": "30 4 * * *",
+      "config_templates": {}
+    }
+  },
+  "utility_entrypoints": {
+    "agents-quality-check.py": {
+      "lib_component": "agents-report",
+      "module": "agents_radar_quality_check.py"
+    },
+    "codexradar.py": {
+      "lib_component": "agents-report",
+      "module": "codexradar_efficiency.py"
+    }
+  },
+  "runtime_adapters": {
+    "hermes": {
+      "scripts_dir": "scripts/glance-brief",
+      "data_dir": "data/glance-brief",
+      "jobs_file": "cron/jobs.json"
+    }
+  }
+}

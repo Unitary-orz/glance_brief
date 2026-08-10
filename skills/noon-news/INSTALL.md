@@ -1,5 +1,9 @@
 # noon-news installation
 
+> **正式安装：** 从仓库根目录按 [INSTALL.md](../../INSTALL.md) 的 Agent
+> 安装契约执行（`install/install.py` + 创建 Cron 任务）。以下为本地开发
+> 运行方式，仅用于手工检查数据。
+
 ## Dependencies
 
 - Python 3.10+

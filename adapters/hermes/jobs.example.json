@@ -2,11 +2,12 @@
   "version": 1,
   "runtime": "hermes",
   "template": true,
+  "note": "Template for creating Hermes jobs. After running install/install.py, the job `script` must be the relative path under $HERMES_HOME/scripts/ (e.g. glance-brief/agents-report.py), NOT a repository path. Fill in model and deliver; do not commit real chat ids.",
   "jobs": [
     {
       "name": "agents-report daily",
       "schedule_utc": "0 2 * * *",
-      "script": "skills/agents-report/scripts/agents_radar_prefetch.py",
+      "script": "glance-brief/agents-report.py",
       "prompt_file": "skills/agents-report/prompts/agents-report-v2.md",
       "model": "<model>",
       "deliver": "<platform>:<chat_id>"
@@ -14,7 +15,7 @@
     {
       "name": "noon-news",
       "schedule_utc": "30 4 * * *",
-      "script": "skills/noon-news/scripts/noon_news_prefetch.py",
+      "script": "glance-brief/noon-news.py",
       "prompt_file": "skills/noon-news/prompts/news-brief-v2.md",
       "model": "<model>",
       "deliver": "<platform>:<chat_id>"

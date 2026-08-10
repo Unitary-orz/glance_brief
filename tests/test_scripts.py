@@ -65,8 +65,18 @@ class AdapterTests(unittest.TestCase):
         payload = json.loads(
             (ROOT / "adapters/hermes/jobs.example.json").read_text(encoding="utf-8")
         )
+        manifest = json.loads(
+            (ROOT / "install/install-manifest.json").read_text(encoding="utf-8")
+        )
+        entrypoints = {
+            spec["entrypoint"] for spec in manifest["components"].values()
+        } | set(manifest["utility_entrypoints"].keys())
         for job in payload["jobs"]:
-            self.assertTrue((ROOT / job["script"]).is_file(), job["script"])
+            # Job scripts are runtime paths relative to $HERMES_HOME/scripts/,
+            # not repository paths; the entry point name must be declared in
+            # the install manifest.
+            self.assertRegex(job["script"], r"^glance-brief/[A-Za-z0-9._-]+\.py$", job["script"])
+            self.assertIn(Path(job["script"]).name, entrypoints, job["script"])
             self.assertTrue((ROOT / job["prompt_file"]).is_file(), job["prompt_file"])
 
     def test_private_skill_configs_are_gitignored(self):

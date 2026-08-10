@@ -71,6 +71,22 @@ AI / Agents 生态日报：
 
 `glance_brief` 是需要安装的工具集，不是在线新闻网站，也不是已经托管好的订阅服务。安装后选择需要的日报，按对应说明配置即可。
 
+### 使用 Agent 安装（推荐）
+
+把本仓库交给有终端与任务调度能力的 Agent，并让它执行根目录 [INSTALL.md](INSTALL.md) 的安装契约：
+
+```text
+请安装 glance_brief：
+https://github.com/Unitary-orz/glance_brief
+
+克隆仓库后读取根目录 INSTALL.md，按其中的 Agent Installation Contract 执行；
+创建定时任务或设置投递目标前先向我展示预览并确认。
+```
+
+安装器会复制运行文件、生成默认配置、检查依赖，并输出待创建的定时任务建议；任务创建、投递目标由 Agent 在您确认后完成。
+
+### 手工安装（备选）
+
 ```bash
 git clone https://github.com/Unitary-orz/glance_brief.git
 cd glance_brief
