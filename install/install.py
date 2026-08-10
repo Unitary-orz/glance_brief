@@ -10,11 +10,17 @@ jobs; the installing agent does that with the runtime's own job interface
 Actions:
     install   --runtime hermes [--components a,b] [--prefix DIR] [--dry-run]
     verify    --runtime hermes [--prefix DIR]
+    doctor    --runtime hermes [--prefix DIR]
     uninstall --runtime hermes [--prefix DIR] [--dry-run]
 
 Semantics:
     - install is idempotent; re-running it updates project-owned files and
       preserves user config/state/output under the runtime data dir.
+    - verify checks that the installation is complete and wired (manifest,
+      entry points, lib hashes, config files, cron wiring).
+    - doctor checks runtime health: entry points compile, config parses,
+      external skills and deps exist, cron jobs are wired, and the latest
+      report output is fresh. It never fetches data or sends anything.
     - uninstall removes only files listed in the installed manifest and
       reports which jobs to detach. User config is preserved by default.
     - No third-party dependencies: stdlib only.
@@ -26,8 +32,11 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import py_compile
+import re
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -368,6 +377,156 @@ def cmd_verify(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_doctor(args) -> int:
+    """Component completeness + runtime hints for an installing/updating agent.
+
+    Statuses: 'ok' (complete), 'warn' (optional hint: missing external skill,
+    stale output, job error), 'error' (installation is broken). Warnings are
+    hints only and do not fail the check; exit code is 1 only when a hard
+    error is present. Read-only: never fetches data and never sends anything.
+    """
+    manifest = load_json(MANIFEST_PATH)
+    home = hermes_home(args.prefix)
+    rt = manifest["runtime_adapters"][args.runtime]
+    scripts_root = home / rt["scripts_dir"]
+    data_root = home / rt["data_dir"]
+
+    components: dict[str, dict] = {}
+    warnings: list[str] = []
+    errors: list[str] = []
+
+    def emit(group: str, name: str, status: str, detail: str):
+        components.setdefault(group, {})[name] = {"status": status, "detail": detail}
+        if status == "error":
+            errors.append(f"{group}.{name}: {detail}")
+        elif status == "warn":
+            warnings.append(f"{group}.{name}: {detail}")
+
+    installed_path = data_root / INSTALL_MANIFEST_NAME
+    installed = load_json(installed_path) if installed_path.exists() else None
+    if installed is None:
+        emit("runtime", "installed-manifest", "error", "not installed; run install first")
+
+    # per-component completeness: entry point, lib hashes, config
+    if installed:
+        entry_map = {spec["entrypoint"]: comp for comp, spec in manifest["components"].items()}
+        entry_map.update({name: spec["lib_component"] for name, spec in manifest["utility_entrypoints"].items()})
+        lib_hashes = {f["path"]: f["sha256"] for f in installed.get("owned_files", [])}
+
+        for comp in installed.get("components", []):
+            group = f"component:{comp}"
+            # entry point
+            ep_name = installed.get("entrypoints", {}).get(comp)
+            ep = scripts_root / ep_name if ep_name else None
+            if ep and ep.exists():
+                try:
+                    py_compile.compile(str(ep), doraise=True)
+                    emit(group, "entrypoint", "ok", ep_name)
+                except py_compile.PyCompileError as exc:
+                    emit(group, "entrypoint", "error", f"{ep_name}: {exc}")
+            else:
+                emit(group, "entrypoint", "error", f"missing {ep_name}")
+            # lib hashes
+            for path, sha in lib_hashes.items():
+                if not path.startswith(f"lib/{comp}/"):
+                    continue
+                live = scripts_root / path
+                if not live.exists():
+                    emit(group, path, "error", "missing")
+                    continue
+                ok = sha256(live) == sha
+                emit(group, path, "ok" if ok else "error", "match" if ok else "hash drift")
+            # config templates
+            for cfg_name in manifest["components"][comp].get("config_templates", {}):
+                p = data_root / "config" / cfg_name
+                if not p.exists():
+                    emit(group, f"config:{cfg_name}", "warn", "missing default config (seeded at install)")
+                    continue
+                try:
+                    json.loads(p.read_text(encoding="utf-8"))
+                    emit(group, f"config:{cfg_name}", "ok", "parses")
+                except (OSError, ValueError) as exc:
+                    emit(group, f"config:{cfg_name}", "error", f"invalid JSON: {exc}")
+
+    # dependencies and external skills (shared, hints)
+    for dep in manifest.get("python_deps", []):
+        pkg = dep.split(">=")[0].split("==")[0].strip()
+        ok = importlib.util.find_spec(pkg) is not None
+        emit("dependencies", dep, "ok" if ok else "warn", "importable" if ok else "missing; pip install it")
+    for name, spec in manifest.get("external_skills", {}).items():
+        p = home / "skills" / name / spec["expected_script"]
+        emit("dependencies", f"skill:{name}", "ok" if p.exists() else "warn",
+             str(p) if p.exists() else f"missing; obtain from {spec['source_hint']}")
+
+    # runtime hints: cron wiring, job status, output freshness
+    jobs_file = home / rt["jobs_file"]
+    wired = []
+    if jobs_file.exists():
+        try:
+            jobs = load_json(jobs_file).get("jobs", [])
+            scripts_base = home / "scripts"
+            for job in jobs:
+                script = job.get("script", "")
+                if script and Path(script).name in ENTRYPOINTS and (scripts_base / script).exists():
+                    wired.append(job)
+        except (OSError, ValueError) as exc:
+            emit("runtime", "cron-jobs", "error", f"cannot read {jobs_file}: {exc}")
+    else:
+        emit("runtime", "cron-jobs", "warn", f"no jobs file at {jobs_file}; jobs not created yet")
+
+    if wired:
+        emit("runtime", "cron-wiring", "ok", f"{len(wired)} job(s) wired")
+        for job in wired:
+            jid = job.get("id")
+            status = job.get("last_status", "unknown")
+            ok = status in (None, "ok", "unknown")
+            emit("runtime", f"job:{jid}", "ok" if ok else "warn",
+                 f"{job.get('name')} last_status={status}" + (f" error={str(job.get('last_error'))[:160]}" if job.get("last_error") else ""))
+            deliver = job.get("deliver") or ""
+            if deliver:
+                emit("runtime", f"deliver:{jid}", "ok", deliver)
+            else:
+                emit("runtime", f"deliver:{jid}", "warn",
+                     "delivery target not configured; ask the user which platform and target to deliver to "
+                     "(e.g. feishu:<chat_id>, telegram:<chat_id>, or origin) and set the job deliver field")
+            if not (job.get("model") or ""):
+                emit("runtime", f"model:{jid}", "warn", "model not set (runtime default applies)")
+    else:
+        emit("runtime", "cron-wiring", "warn", "no jobs wired to glance-brief entry points")
+
+    out_dir = data_root / "output" / "agents-radar"
+    if out_dir.is_dir():
+        files = sorted(out_dir.glob("agents-radar-*.txt"), key=lambda p: p.stat().st_mtime)
+        if files:
+            latest = files[-1]
+            try:
+                match = re.search(r"(\d{4}-\d{2}-\d{2})", latest.name)
+                latest_date = datetime.strptime(match.group(1), "%Y-%m-%d").date() if match else None
+                today = datetime.now().astimezone().date()
+                age_days = (today - latest_date).days if latest_date else -1
+            except ValueError:
+                latest_date, age_days = None, -1
+            detail = f"{latest.name} (age={age_days}d)" if age_days >= 0 else latest.name
+            emit("runtime", "latest-output",
+                 "ok" if age_days is not None and 0 <= age_days <= 1 else "warn",
+                 detail + ("; check whether this morning's job ran" if not (age_days is not None and 0 <= age_days <= 1) else ""))
+        else:
+            emit("runtime", "latest-output", "warn", "no output files under output/agents-radar yet")
+    else:
+        emit("runtime", "latest-output", "warn", f"output dir missing: {out_dir}")
+
+    result = {
+        "action": "doctor",
+        "ok": not errors,
+        "runtime": args.runtime,
+        "components": components,
+        "warnings": warnings,
+        "errors": errors,
+    }
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if not errors else 1
+
+
 def cmd_uninstall(args) -> int:
     home = hermes_home(args.prefix)
     rt = load_json(MANIFEST_PATH)["runtime_adapters"][args.runtime]
@@ -450,6 +609,10 @@ def main() -> int:
     p_verify.add_argument("--runtime", default="hermes", choices=["hermes"])
     p_verify.add_argument("--prefix", default="")
 
+    p_doctor = sub.add_parser("doctor", help="runtime health check (read-only)")
+    p_doctor.add_argument("--runtime", default="hermes", choices=["hermes"])
+    p_doctor.add_argument("--prefix", default="")
+
     p_uninstall = sub.add_parser("uninstall", help="remove project-owned files (keeps user config)")
     p_uninstall.add_argument("--runtime", default="hermes", choices=["hermes"])
     p_uninstall.add_argument("--prefix", default="")
@@ -460,6 +623,8 @@ def main() -> int:
         return cmd_install(args)
     if args.action == "verify":
         return cmd_verify(args)
+    if args.action == "doctor":
+        return cmd_doctor(args)
     if args.action == "uninstall":
         return cmd_uninstall(args)
     return 2

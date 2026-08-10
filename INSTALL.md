@@ -81,6 +81,27 @@ least one Cron job is wired to a `glance-brief/` entry point. Report the
 failing checks to the user; a job whose prefetch output is stale is not a
 verify failure — the report is produced by the scheduled job itself.
 
+## Doctor (component completeness + hints)
+
+```bash
+python3 install/install.py doctor --runtime hermes [--prefix <hermes-home>]
+```
+
+Read-only check for an installing or updating agent. It reports each
+installed component (`agents-report`, `noon-news`) with its entry point,
+library hashes and config files, then shared dependencies (external news
+skills, Python deps) and runtime hints (Cron wiring, job last status,
+delivery target, model, latest output freshness). Every item has a status:
+
+- `ok` — complete;
+- `warn` — optional hint only (missing external skill, stale output, job
+  error); the agent should tell the user, not fail;
+- `error` — installation is broken (entry point missing, hash drift, config
+  unparseable).
+
+Exit code is 1 only when an `error` is present. Doctor never fetches source
+data and never sends a message.
+
 ## Uninstall
 
 ```bash
