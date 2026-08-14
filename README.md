@@ -28,7 +28,7 @@
 
 | 第三方模块 | 输出板块 |
 |---|---|
-| AI HOT（行业 / 论文 / public 精选） | agents-report · 🤖 AI 生态动态；noon-news · AI 主题 |
+| AI HOT（v1 全局精选 / public 兼容层） | agents-report · 🤖 AI 生态动态；noon-news · AI 主题 |
 | CodexRadar 效率快照 | agents-report · 🧠 CodexRadar 智力效率 |
 | agents-radar 生态日报（ai-trending） | agents-report · 🔥 开源热点趋势 |
 | news-aggregator-skill（HN / GitHub / 36Kr / 微博等 8 源） | noon-news · 今日要点 + 分类详情 |

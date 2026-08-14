@@ -32,7 +32,7 @@ python3 skills/agents-report/scripts/agents_radar_prefetch.py
 ## 数据来源
 
 - agents-radar：`https://duanyytop.github.io/agents-radar/feed.xml`
-- AI HOT v1：`/api/v1/items?mode=selected&category=<slug>&window=24h&limit=20`
+- AI HOT v1：`/api/v1/items?mode=selected&window=24h&by=timeline&limit=20`；分类读取 `items[*].category`，不假定固定分类名称
 - CodexRadar：公开 snapshot，失败时回退原始评测表
 
 ## 配置
@@ -72,5 +72,5 @@ prompts/agents-report-v2.md
 ## 失败处理
 
 - agents-radar 失败或正文选择失败：输出 `⚠️ agents-radar 报告获取失败，请检查网络`，不要用常识补齐。
-- AI HOT 某分类失败：只影响 AI 生态动态，仍可使用另一分类；证据不足时写“信息有限”。
+- AI HOT 请求失败或全局精选为空：只影响 AI 生态动态；证据不足时写“信息有限”，不得把固定分类为空表述成整个 AI HOT 没有新条目。
 - CodexRadar 失败：原样使用脚本中的“信息有限”提示。

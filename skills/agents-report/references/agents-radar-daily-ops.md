@@ -9,7 +9,7 @@ This guide describes the current content-marker based agents-radar pipeline. It 
 ```text
 agents_radar_prefetch.py
   ├── agents-radar-daily.py --source ai-trending
-  ├── AI HOT v1: industry + paper, window=24h
+  ├── AI HOT v1: selected global pool, window=24h, by=timeline
   └── codexradar_efficiency.py
 ```
 

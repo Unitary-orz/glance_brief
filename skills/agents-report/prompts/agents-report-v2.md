@@ -8,7 +8,7 @@
 
 ## 数据来源
 
-- `aihot.categories.industry` 和 `aihot.categories.paper`：近 24 小时 AI HOT v1 数据，用于 AI 生态动态。
+- `aihot.items`：近 24 小时 AI HOT v1 全局精选，用于 AI 生态动态；分类以每条 `item.category` 为准，不假定固定分类名称。
 - `codexradar.markdown`：脚本已经渲染好的 CodexRadar 板块，必须原样插入。
 - `agents_radar.stdout`：脚本按正文标记选取的 ai-trending 内容，用于开源趋势和项目。
 - `agents_radar.open_source_quality`：来源项目链接、分类计数和 `其他项目` 上限的机器检查结果。
