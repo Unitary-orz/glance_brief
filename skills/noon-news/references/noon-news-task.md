@@ -10,7 +10,7 @@ The noon-news task prefetches source data and leaves formatting to the runtime P
 noon_news_prefetch.py
   ├── news-aggregator
   ├── news-summary RSS
-  └── AI HOT public API
+  └── AI HOT v1 全局精选（`/api/v1/items`，`mode=selected&window=24h&by=timeline`）
 ```
 
 All child script paths are supplied by environment variables. The project does not assume an OpenClaw or Hermes directory.

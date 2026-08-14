@@ -55,7 +55,7 @@ class FixtureTests(unittest.TestCase):
             self.assertIn("returncode", payload[source])
             self.assertIn("stderr", payload[source])
             self.assertIsInstance(payload[source]["items"], list)
-        for field in ("count", "since", "take", "endpoint"):
+        for field in ("count", "window", "by", "limit", "endpoint"):
             self.assertIn(field, payload["aihot"])
         self.assertIn("instructions", payload)
 

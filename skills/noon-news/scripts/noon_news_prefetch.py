@@ -13,9 +13,9 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 
 def python_with_modules(*modules: str) -> str:
@@ -41,11 +41,14 @@ RSS_PYTHON = python_with_modules("feedparser")
 
 AIHOT_UA = os.environ.get(
     "AIHOT_USER_AGENT",
-    "aihot-skill/0.3.6 (+https://aihot.virxact.com/aihot-skill/)",
+    "aihot-skill/1.3.0 (+https://aihot.virxact.com/aihot-skill/)",
 )
-AIHOT_BASE = os.environ.get("AIHOT_PUBLIC_BASE", "https://aihot.virxact.com/api/public")
-AIHOT_SINCE_HOURS = int(os.environ.get("NOON_AIHOT_SINCE_HOURS", "24"))
-AIHOT_TAKE = int(os.environ.get("NOON_AIHOT_TAKE", "20"))
+AIHOT_BASE = os.environ.get(
+    "AIHOT_V1_BASE",
+    "https://aihot.virxact.com/api/v1/items",
+)
+AIHOT_WINDOW = os.environ.get("NOON_AIHOT_WINDOW", "24h")
+AIHOT_LIMIT = int(os.environ.get("NOON_AIHOT_LIMIT", "20"))
 NEWS_AGGREGATOR_SCRIPT = os.environ.get(
     "NEWS_AGGREGATOR_SCRIPT",
     "news-aggregator-skill/scripts/fetch_news.py",
@@ -138,9 +141,15 @@ def _curl_available() -> bool:
     return shutil.which("curl") is not None
 
 
-def _aihot_since_iso() -> str:
-    delta = timedelta(hours=AIHOT_SINCE_HOURS)
-    return (datetime.now(timezone.utc) - delta).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _aihot_url() -> tuple[str, str]:
+    window = AIHOT_WINDOW if AIHOT_WINDOW in {"24h", "7d"} else "24h"
+    query = urlencode({
+        "mode": "selected",
+        "window": window,
+        "by": "timeline",
+        "limit": str(AIHOT_LIMIT),
+    })
+    return f"{AIHOT_BASE.rstrip('?&')}?{query}", window
 
 
 def fetch_aihot() -> dict[str, Any]:
@@ -154,8 +163,7 @@ def fetch_aihot() -> dict[str, Any]:
     if not _curl_available():
         return {"ok": False, "error": "curl not found in PATH", "items": []}
 
-    since = _aihot_since_iso()
-    url = f"{AIHOT_BASE}/items?mode=selected&since={since}&take={AIHOT_TAKE}"
+    url, window = _aihot_url()
 
     last_err: str | None = None
     for attempt in (1, 2):
@@ -164,6 +172,7 @@ def fetch_aihot() -> dict[str, Any]:
                 [
                     "curl",
                     "-sS",
+                    "-f",
                     "--max-time",
                     "20",
                     "-H",
@@ -178,30 +187,35 @@ def fetch_aihot() -> dict[str, Any]:
             return {
                 "ok": False,
                 "error": f"curl could not start: {exc}",
-                "since": since,
+                "window": window,
+                "limit": AIHOT_LIMIT,
                 "endpoint": url,
                 "items": [],
             }
         if proc.returncode == 0 and proc.stdout.strip():
             parsed = parse_jsonish(proc.stdout)
-            # aihot wraps items in {count, hasNext, nextCursor, items: [...]};
-            # tolerate either shape (bare list or wrapped dict).
-            if isinstance(parsed, list):
-                items = parsed
-            elif isinstance(parsed, dict) and isinstance(parsed.get("items"), list):
+            if (
+                isinstance(parsed, dict)
+                and isinstance(parsed.get("items"), list)
+                and isinstance(parsed.get("page"), dict)
+            ):
                 items = parsed["items"]
+                page = parsed["page"]
             else:
                 if isinstance(parsed, dict):
-                    last_err = parsed.get("parse_error") or "aihot JSON has no items list"
+                    last_err = parsed.get("parse_error") or "aihot v1 JSON must contain items and page"
                 else:
-                    last_err = "aihot returned unexpected payload shape"
+                    last_err = "aihot v1 returned unexpected payload shape"
                 break  # parse error → don't retry
             return {
                 "ok": True,
                 "items": items,
-                "count": len(items),
-                "since": since,
-                "take": AIHOT_TAKE,
+                "count": page.get("count", len(items)),
+                "has_more": bool(page.get("hasMore", False)),
+                "next_cursor": page.get("nextCursor"),
+                "window": window,
+                "by": "timeline",
+                "limit": AIHOT_LIMIT,
                 "endpoint": url,
             }
         last_err = (proc.stderr or "").strip() or f"curl exit {proc.returncode}"
@@ -213,7 +227,9 @@ def fetch_aihot() -> dict[str, Any]:
     return {
         "ok": False,
         "error": last_err or "aihot fetch failed after retries",
-        "since": since,
+        "window": window,
+        "by": "timeline",
+        "limit": AIHOT_LIMIT,
         "endpoint": url,
         "items": [],
     }

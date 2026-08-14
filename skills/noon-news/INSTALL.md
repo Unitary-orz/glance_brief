@@ -40,9 +40,9 @@ Use the runtime adapter to set:
 - `NEWS_PYTHON`
 - `NEWS_AGGREGATOR_SCRIPT`
 - `NEWS_SUMMARY_SCRIPT`
-- `AIHOT_PUBLIC_BASE`
-- `NOON_AIHOT_SINCE_HOURS`
-- `NOON_AIHOT_TAKE`
+- `AIHOT_V1_BASE`
+- `NOON_AIHOT_WINDOW`（`24h` 或 `7d`）
+- `NOON_AIHOT_LIMIT`
 
 ## Verification
 

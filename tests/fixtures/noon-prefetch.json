@@ -19,12 +19,23 @@
   "aihot": {
     "ok": true,
     "items": [
-      {"title": "Example AI", "links": {"aihot": "https://example.com/ai"}}
+      {
+        "title": "Example AI",
+        "source": {"name": "Example source"},
+        "links": {
+          "aihot": "https://example.com/ai",
+          "original": "https://example.com/ai-original"
+        },
+        "category": "ai-products"
+      }
     ],
     "count": 1,
-    "since": "2026-08-06T00:00:00Z",
-    "take": 20,
-    "endpoint": "https://example.com/api/public/items?mode=selected&since=2026-08-06T00:00:00Z&take=20"
+    "has_more": false,
+    "next_cursor": null,
+    "window": "24h",
+    "by": "timeline",
+    "limit": 20,
+    "endpoint": "https://example.com/api/v1/items?mode=selected&window=24h&by=timeline&limit=20"
   },
   "instructions": {
     "source_first": "Use only fetched source data.",
