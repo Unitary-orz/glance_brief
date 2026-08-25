@@ -42,10 +42,13 @@
     "intelligence_top_n": 2,
     "value_top_n": 3,
     "value_scope": "non_sol_explicit_watch_configs",
-    "value_method": "iq_per_price_power_with_iq_floor",
+    "value_method": "iq_times_price_step_factor",
     "value_iq_floor": 70,
-    "value_price_exponent": 0.25,
-    "value_ratio_metric": "iq_per_average_price_usd_powered",
+    "value_price_bands": [
+      {"max_price_usd": 0.30, "factor": 1.00},
+      {"max_price_usd": 0.50, "factor": 0.98},
+      {"factor": 0.90}
+    ],
     "balanced_top_n": 2,
     "balanced_scope": "all_explicit_watch_configs",
     "balanced_method": "geometric_mean_percentile_iq_time_price",

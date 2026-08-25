@@ -200,6 +200,52 @@ class CodexRadarTests(unittest.TestCase):
         ranked = codexradar.rank_value(data, ranking, config)
         self.assertEqual(ranked[0]["model"], "quality-model")
 
+    def test_rank_value_uses_configured_price_steps(self):
+        data = [
+            {
+                "model": "deepseek-v4-flash",
+                "effort": "max",
+                "iq": 85.3,
+                "price": 0.22,
+                "minutes": 31.6,
+                "combined_cost": 1.0,
+            },
+            {
+                "model": "gpt-5.6-luna",
+                "effort": "xhigh",
+                "iq": 85.3,
+                "price": 0.31,
+                "minutes": 23.1,
+                "combined_cost": 1.0,
+            },
+            {
+                "model": "gpt-5.6-luna",
+                "effort": "max",
+                "iq": 92.4,
+                "price": 0.47,
+                "minutes": 32.1,
+                "combined_cost": 1.0,
+            },
+        ]
+        ranking = {
+            "value_top_n": 3,
+            "value_price_bands": [
+                {"max_price_usd": 0.30, "factor": 1.00},
+                {"max_price_usd": 0.50, "factor": 0.98},
+                {"factor": 0.90},
+            ],
+        }
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        ranked = codexradar.rank_value(data, ranking, config)
+        self.assertEqual(
+            [(point["model"], point["effort"]) for point in ranked],
+            [
+                ("gpt-5.6-luna", "max"),
+                ("deepseek-v4-flash", "max"),
+                ("gpt-5.6-luna", "xhigh"),
+            ],
+        )
+
     def test_restricted_value_scope_does_not_fallback_to_sol(self):
         data = [
             {
@@ -320,6 +366,8 @@ class NoonNewsTests(unittest.TestCase):
     def test_prompt_keeps_source_on_separate_line(self):
         prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
         self.assertIn("> 来源：[NS•AlJazeera](原文链接)•[BBC](原文链接)", prompt)
+        self.assertIn("每条分类详情必须严格占用连续三行", prompt)
+        self.assertIn("禁止写成“标题：描述”或“标题（短题）：描述”", prompt)
         self.assertIn("来源单独一行，用引用块（`> 来源：`）", prompt)
         self.assertIn("正文不显示 URL 明文", prompt)
         self.assertIn("冒号一律替换为 `•`", prompt)
@@ -330,6 +378,8 @@ class NoonNewsTests(unittest.TestCase):
         self.assertIn("链接使用脚本原始条目的 `link` 或 `url`", prompt)
         self.assertIn("严格输出 4–5 条编号列表", prompt)
         self.assertIn("主题词为 2–6 个中文字符", prompt)
+        self.assertIn("只有原始标题为英文时，才在英文标题后加中文短题括号", prompt)
+        self.assertIn("非英文原始标题没有括号翻译", prompt)
         self.assertNotIn("事实描述。（来源", prompt)
         self.assertNotIn("[NS](原文链接) · [BBC](原文链接)", prompt)
 

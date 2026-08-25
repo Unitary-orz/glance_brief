@@ -81,6 +81,35 @@ def raw_combined_cost(minutes: float, price: float) -> float:
     return price * (minutes / 10.0) ** COMBINED_COST_WEIGHT * 100.0
 
 
+def value_price_factor(price: float, ranking: dict[str, Any]) -> float | None:
+    bands = ranking.get("value_price_bands")
+    if bands is None:
+        return None
+    if not isinstance(bands, list) or not bands:
+        raise ValueError("value_price_bands must be a non-empty list")
+    previous_max = -1.0
+    fallback: float | None = None
+    for index, band in enumerate(bands):
+        if not isinstance(band, dict):
+            raise ValueError(f"value_price_bands[{index}] must be an object")
+        factor = as_float(band.get("factor"))
+        if factor is None or factor <= 0:
+            raise ValueError(f"value_price_bands[{index}].factor must be positive")
+        maximum = band.get("max_price_usd")
+        if maximum is None:
+            fallback = factor
+            continue
+        maximum = as_float(maximum)
+        if maximum is None or maximum < previous_max:
+            raise ValueError("value_price_bands max_price_usd must be ascending")
+        previous_max = maximum
+        if price <= maximum:
+            return factor
+    if fallback is None:
+        raise ValueError("value_price_bands must end with a fallback band")
+    return fallback
+
+
 def point_from_snapshot(point: dict[str, Any]) -> dict[str, Any] | None:
     model = point.get("model")
     effort = point.get("effort")
@@ -282,9 +311,15 @@ def rank_value(points: list[dict[str, Any]], ranking: dict[str, Any], config: di
         item = dict(point)
         price = point["price"]
         item["value_is_free"] = price == 0
-        item["value_score"] = (
-            None if item["value_is_free"] else point["iq"] / price ** price_exponent
-        )
+        if item["value_is_free"]:
+            item["value_score"] = None
+        else:
+            step_factor = value_price_factor(price, ranking)
+            if step_factor is None:
+                item["value_score"] = point["iq"] / price ** price_exponent
+            else:
+                item["value_score"] = point["iq"] * step_factor
+                item["value_price_factor"] = step_factor
         scored.append(item)
     scored.sort(
         key=lambda p: (
