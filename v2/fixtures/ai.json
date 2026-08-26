@@ -1,0 +1,34 @@
+{
+  "fixture": true,
+  "fixture_note": "Offline example data only; these are not current AI reports.",
+  "payload": {
+    "entries": [
+      {
+        "headline": "[Fixture] 智能体编排工具增加可审计流程示例",
+        "abstract": "示例 AI 候选：一个虚构工具链演示如何记录智能体步骤，便于人工复核和离线摘要测试。",
+        "permalink": "https://example.com/fixtures/ai/agent-audit-workflow",
+        "publisher": {
+          "name": "Example AI Digest"
+        },
+        "published": "2026-01-15T09:15:00Z",
+        "category": "industry",
+        "tags": ["agents", "orchestration", "audit"],
+        "evidence": "fixture-summary",
+        "confidence": "example"
+      },
+      {
+        "title": "[Fixture] 小型模型工具调用研究摘要",
+        "summary": "示例 AI 研究候选：一份虚构研究摘要讨论小型模型在工具调用任务中的评测方法。",
+        "links": {
+          "primary": "https://example.com/fixtures/ai/small-model-tool-use"
+        },
+        "publisher": "Example Research Desk",
+        "date": "2026-01-15",
+        "category": "paper",
+        "tags": ["models", "tool-use", "evaluation"],
+        "evidence": ["fixture-paper"],
+        "confidence": "example"
+      }
+    ]
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "news_wire": {
+      "driver": "json_file",
+      "path": "../fixtures/news.json",
+      "items_path": "items",
+      "label": "News",
+      "map": {
+        "title": ["title", "headline"],
+        "text": ["summary", "description", "content"],
+        "url": ["links.canonical", "url", "link"],
+        "publisher": ["source.name", "publisher", "source"],
+        "published_at": ["published_at", "publishedAt", "date"],
+        "extra": {
+          "category": "category"
+        }
+      }
+    },
+    "ai_digest": {
+      "driver": "json_file",
+      "path": "../fixtures/ai.json",
+      "items_path": "payload.entries",
+      "label": "AIHOT",
+      "map": {
+        "title": ["headline", "title"],
+        "text": ["abstract", "summary", "description"],
+        "url": ["permalink", "links.primary", "url"],
+        "publisher": ["publisher.name", "publisher", "source"],
+        "published_at": ["published", "published_at", "date"],
+        "extra": {
+          "category": "category"
+        }
+      }
+    },
+    "open_source_radar": {
+      "driver": "json_file",
+      "path": "../fixtures/open-source.json",
+      "items_path": "signals.hot_today",
+      "label": "Radar",
+      "map": {
+        "title": ["full_name", "name", "title"],
+        "text": ["description", "summary"],
+        "url": ["html_url", "url"],
+        "publisher": ["owner.login", "publisher", "source"],
+        "published_at": ["observed_at", "published_at", "date"],
+        "extra": {
+          "kind": "kind",
+          "category": ["category", "language"],
+          "role": "role",
+          "stars_today": "stars_today"
+        }
+      }
+    },
+    "codex_radar": {
+      "driver": "json_file",
+      "path": "../fixtures/codexradar.json",
+      "items_path": "snapshot.points",
+      "label": "CodexRadar",
+      "map": {
+        "title": ["model", "name"],
+        "extra": {
+          "ranking": "rankings",
+          "effort": "effort",
+          "iq": "iq",
+          "average_minutes": "average_minutes",
+          "average_price_usd": "average_price_usd"
+        }
+      }
+    }
+  },
+  "reports": {
+    "noon-news": {
+      "sections": {
+        "international": [
+          {"source": "news_wire", "match": {"category": ["international"]}, "take": 8}
+        ],
+        "domestic": [
+          {"source": "news_wire", "match": {"category": ["domestic"]}, "take": 8}
+        ],
+        "business": [
+          {"source": "news_wire", "match": {"category": ["business"]}, "take": 8}
+        ],
+        "ai": [
+          {"source": "ai_digest", "take": 8},
+          {"source": "news_wire", "match": {"category": ["ai"]}, "take": 4}
+        ]
+      }
+    },
+    "agents-report": {
+      "sections": {
+        "ai_ecosystem": [
+          {"source": "ai_digest", "take": 8}
+        ],
+        "model_efficiency": [
+          {"source": "codex_radar", "take": 12}
+        ],
+        "open_source": [
+          {"source": "open_source_radar", "take": 25}
+        ]
+      }
+    }
+  }
+}

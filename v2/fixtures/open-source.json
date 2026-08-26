@@ -1,0 +1,36 @@
+{
+  "fixture": true,
+  "fixture_note": "Offline example data only; repository names and trends are illustrative.",
+  "signals": {
+    "hot_today": [
+      {
+        "kind": "trend",
+        "description": "示例趋势一：智能体工具正在从单一能力转向可组合工作流。"
+      },
+      {
+        "kind": "trend",
+        "description": "示例趋势二：本地模型路由开始统一记录质量、延迟与成本。"
+      },
+      {
+        "kind": "project",
+        "full_name": "example-org/fixture-agent-kit",
+        "description": "示例开源候选：用于演示智能体工具注册的虚构 Python 项目。",
+        "html_url": "https://github.com/example-org/fixture-agent-kit",
+        "owner": {"login": "example-org"},
+        "observed_at": "2026-01-15T11:00:00Z",
+        "category": "Agent 工具",
+        "role": "hot"
+      },
+      {
+        "kind": "project",
+        "full_name": "example-lab/fixture-model-router",
+        "summary": "示例开源候选：用于演示模型路由和成本记录的虚构 TypeScript 项目。",
+        "url": "https://github.com/example-lab/fixture-model-router",
+        "publisher": "example-lab",
+        "date": "2026-01-15",
+        "category": "Agent 工具",
+        "role": "other"
+      }
+    ]
+  }
+}

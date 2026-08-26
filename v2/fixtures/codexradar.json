@@ -1,0 +1,46 @@
+{
+  "fixture": true,
+  "fixture_note": "Offline example data only; benchmark values are synthetic and must not be treated as current measurements.",
+  "snapshot": {
+    "snapshot_at": "2026-01-15T12:00:00Z",
+    "points": [
+      {
+        "model": "fixture-model-alpha",
+        "summary": "示例基准点：高 effort 配置，用于验证 CodexRadar 字段保留。",
+        "reference": "https://example.com/fixtures/codexradar/fixture-model-alpha",
+        "provider": "Example Benchmark Lab",
+        "effort": "high",
+        "iq": 92,
+        "average_minutes": 2.4,
+        "average_price_usd": 0.03,
+        "rankings": ["intelligence_top2", "value_top3"],
+        "benchmark": "fixture-suite"
+      },
+      {
+        "model": "fixture-model-beta",
+        "summary": "示例基准点：balanced effort 配置，用于验证不同指标和榜单标签。",
+        "reference": "https://example.com/fixtures/codexradar/fixture-model-beta",
+        "provider": "Example Benchmark Lab",
+        "effort": "balanced",
+        "iq": 84,
+        "average_minutes": 1.6,
+        "average_price_usd": 0.02,
+        "rankings": ["balanced_top2", "value_top3"],
+        "benchmark": "fixture-suite"
+      },
+      {
+        "name": "fixture-model-gamma",
+        "description": "示例基准点：low effort 配置，用于验证 map 的候选字段路径。",
+        "url": "https://example.com/fixtures/codexradar/fixture-model-gamma",
+        "source": "Example Benchmark Lab",
+        "date": "2026-01-15",
+        "effort": "low",
+        "iq": 76,
+        "average_minutes": 0.9,
+        "average_price_usd": 0.01,
+        "rankings": ["value_top3"],
+        "benchmark": "fixture-suite"
+      }
+    ]
+  }
+}
