@@ -17,21 +17,21 @@
 ```text
 schema_version
 ok
-agents_radar
+local_radar
+  source
   ok
-  stdout
-  stderr
-  attempts
-  selected_blocks
-  selection_mode
-  open_source_quality
-    ok
-    source_project_count
-    source_linked_project_count
-    source_unlinked_projects[]
-    categories[]
-    other_projects_max
-    warnings[]
+  returncode
+  report_date
+  generated_at
+  diagnostics
+  quality
+  signals
+    hot_today[]
+    fresh_hot[]
+    new_projects[]
+  local_report_categories[]
+    name
+    projects[]
 aihot
   source
   api
@@ -59,7 +59,7 @@ AI HOT 关键字段：
 - `items[*].source.name`：来源名称
 - `page.count` / `page.hasMore`：分页信息
 
-`agents_radar.open_source_quality` 是离线机器检查结果：它记录来源项目的真实 GitHub 链接覆盖情况和每行 `其他项目` 上限。Prompt 可以据此省略无法链接的项目，但不得猜测或拼接 URL。
+`local_radar` 是独立本地 GitHub 雷达的当天结构化事实源；`signals.hot_today` 是唯一热门项目池，`fresh_hot` 必须是其子集。`local_report_categories` 是当天本地报告最终使用的分类—项目映射，分类标题和项目归属由消费者逐字复用，不得由模型重新分类。该映射必须覆盖 `hot_today`，否则开源板块闭锁，不回退昨天、不重新采集、也不自行补写项目。
 
 采集器只把 HTTP(S) 来源锚点保留为 Markdown；最终项目质量检查再按 `project_link_prefix` 验收仓库链接，默认只接受 `https://github.com/`。检查器解析所有 Markdown 目标后统一拒绝其他协议或前缀，并核对标签中的 `owner/repo` 与 URL 仓库路径。`AGENTS_RADAR_CRON_OUTPUT_DIR` 非空时优先于 JSON 中的 `cron_output_dir`，避免复制示例配置后 `--latest` 仍指向占位路径。
 

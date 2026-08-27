@@ -10,10 +10,10 @@
 
 - `aihot.items`：近 24 小时 AI HOT v1 全局精选，用于 AI 生态动态；分类以每条 `item.category` 为准，不假定固定分类名称。
 - `codexradar.markdown`：脚本已经渲染好的 CodexRadar 板块，必须原样插入。
-- `agents_radar.stdout`：脚本按正文标记选取的 ai-trending 内容，用于开源趋势和项目。
-- `agents_radar.open_source_quality`：来源项目链接、分类计数和 `其他项目` 上限的机器检查结果。
+- `local_radar.signals.hot_today`、`local_radar.signals.fresh_hot` 和 `local_radar.local_report_categories`：本地 GitHub 开源雷达已经完成采集、筛选、排序和分类的结构化数据，用于开源趋势和项目明细。
+- `local_radar.quality` 与项目字段：脚本提供质量检查结果、真实 GitHub URL 和项目事实；模型不得猜测、拼接或改写链接。`local_report_categories` 是当天本地报告最终使用的分类—项目映射，不是候选池分类。
 
-不要根据固定 block 编号猜测内容。某个来源失败或为空时，只影响对应板块；不得用常识或其他来源编造补齐。
+不要根据固定 block 编号或外部资料猜测本地项目内容。某个来源失败或为空时，只影响对应板块；不得用常识或其他来源编造补齐。
 
 ## 全局约束
 
@@ -51,9 +51,8 @@
 - ① [总体趋势综述]
 - ② [总体趋势综述]
 
-[普通文本分类标题]
+[逐字复用 `local_radar.local_report_categories` 的分类标题]
 - 热门项目：...
-- 其他项目：...
 ```
 
 ## AI 生态动态规则
@@ -74,12 +73,14 @@
 
 ## 开源热点趋势规则
 
-- 前两行只根据“今日速览”“趋势信号分析”“社区关注热点”等真实正文归纳总体趋势、技术方向或生态变化。
+- 前两行只根据 `local_radar.signals.hot_today`、`fresh_hot` 的真实项目描述、主题及 `stars_today` 归纳总体趋势、技术方向或生态变化。
 - 前两行不得出现具体项目名、仓库名、公司名、团队名、模型名、Star 数或单个项目简介。
-- 具体项目只能出现在后面的分类明细中。
-- 分类标题为普通文本独立行。
-- 分类中有至少 2 个带 `+X today` 标记的项目时保留独立分类；不足 2 个时与其他小分类合并为 `其他`。
-- 每个分类只输出两行：`热门项目` 和 `其他项目`。
-- `热门项目` 选择原文 `+X today` 最高的一个；没有星数时按原文顺序选择第一项。
-- 最终列出的每个项目都必须保留来源中的真实 GitHub Markdown 链接；链接缺失时直接省略，不得猜测或拼接 URL。
-- `其他项目` 不得超过 `agents_radar.open_source_quality.other_projects_max`，其余项目省略且不得拆出第三行；没有剩余项目时写 `其他项目：无`。
+- 具体项目只能出现在“本期新入榜”和后面的分类明细中。
+- 分类标题必须逐字复用 `local_radar.local_report_categories`，保持该字段的原始顺序；不得根据项目描述、Topics 或模型知识自行分类、改名、合并、拆分或新建分类。
+- 项目只能归入 `local_report_categories` 已列出的对应分类；不得把项目移入“其他”或新造“其他”分类。
+- `fresh_hot` 是 `hot_today` 的子集，只包含最近历史报告中没有出现过的今日热门项目：非空时先按 `fresh_hot` 顺序完整展示“本期新入榜”，再在 `hot_today` 原始位置重复展示，并在项目名链接前加字面量 `✨ `（U+2728 后保留一个空格）；不得使用 `�` 或其他替代符号，也不得用 `first_seen`、`days_seen` 或仓库创建时间自行推断。
+- `new_projects` 是独立的新发现信号；本报告不生成“新发现项目”或“🆕 新发现”区域，也不把它加入项目明细。
+- 每个分类只输出一行项目内容，只保留 `local_report_categories` 中该分类列出的第一项，并将标签固定为 `热门项目`；分类中的其余项目不展示。
+- `热门项目` 必须存在于 `local_radar.signals.hot_today`；分类内项目顺序以 `local_report_categories` 为准，不得重新计算、改名或改写 URL。
+- 最终列出的每个项目都必须保留 JSON 中真实的 GitHub Markdown 链接；URL 必须与项目字段逐字符一致，链接缺失时直接省略，不得猜测或拼接。
+- `local_report_categories` 缺失、不完整或项目不在 `hot_today` 时，不得自行补分类或补项目；开源项目明细写“信息有限”。

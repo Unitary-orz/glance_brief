@@ -2,6 +2,7 @@ import importlib.util
 import json
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
@@ -66,6 +67,51 @@ class AgentsRadarAIHOTTests(unittest.TestCase):
         self.assertEqual(query["window"], ["24h"])
         self.assertEqual(query["by"], ["timeline"])
         self.assertNotIn("category", query)
+
+    def test_run_local_radar_reads_structured_payload(self):
+        payload = {
+            "ok": True,
+            "report_date": "2026-08-27",
+            "diagnostics": {"trending_count": 16},
+            "quality": {"ok": True, "errors": [], "candidate_count": 30},
+            "signals": {
+                "hot_today": [{
+                    "full_name": "Acme/agent-kit",
+                    "url": "https://github.com/Acme/agent-kit",
+                }],
+                "fresh_hot": [],
+                "new_projects": [],
+            },
+            "local_report_categories": [{
+                "name": "① 🤖 Agent / 技能 / 工作流",
+                "projects": ["Acme/agent-kit"],
+            }],
+        }
+        completed = SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(payload),
+            stderr="",
+        )
+        with patch.object(
+            agents_prefetch.subprocess, "run", return_value=completed
+        ) as mocked_run:
+            result = agents_prefetch.run_local_radar()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["source"], "local-open-source-radar")
+        self.assertEqual(
+            result["signals"]["hot_today"][0]["full_name"],
+            "Acme/agent-kit",
+        )
+        self.assertEqual(
+            result["local_report_categories"],
+            [{
+                "name": "① 🤖 Agent / 技能 / 工作流",
+                "projects": ["Acme/agent-kit"],
+            }],
+        )
+        command = mocked_run.call_args.args[0]
+        self.assertTrue(command[1].endswith("local-open-source-radar/read-current.py"))
 
 
 if __name__ == "__main__":

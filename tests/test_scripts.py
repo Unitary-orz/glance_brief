@@ -439,7 +439,10 @@ class OutputContractTests(unittest.TestCase):
             self.assertIn(section, prompt)
         self.assertIn("不超过 140 字", prompt)
         self.assertIn("热门项目", prompt)
-        self.assertIn("其他项目", prompt)
+        self.assertIn("local_report_categories", prompt)
+        self.assertIn("每个分类只输出一行项目内容", prompt)
+        self.assertNotIn("每个分类只输出两行", prompt)
+        self.assertNotIn("- 其他项目：", prompt)
 
     def test_agents_prompt_uses_available_sources_without_padding(self):
         prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
@@ -548,7 +551,6 @@ All context confirmed.
 
 🔧 AI 基础工具
 - 热门项目：[example/project](https://example.com/example/project)「简介」
-- 其他项目：无
 """
         rules = quality.load_quality_config()
         checked = quality.validate_rendered_report(report, rules)
