@@ -60,10 +60,10 @@ MODULE_DIR = HERE / "lib" / "agents-report"
 DATA_DIR = HERMES_HOME / "data" / "glance-brief"
 
 os.environ.setdefault("AGENTS_RADAR_QUALITY_MODULE_DIR", str(MODULE_DIR))
-os.environ.setdefault("AGENTS_RADAR_COLLECTOR", str(MODULE_DIR / "agents-radar-daily.py"))
-os.environ.setdefault("AGENTS_RADAR_OUTPUT_DIR", str(DATA_DIR / "output" / "agents-radar"))
 os.environ.setdefault("AGENTS_RADAR_QUALITY_CONFIG", str(DATA_DIR / "config" / "agents_radar_quality.json"))
 os.environ.setdefault("CODEXRADAR_CONFIG", str(DATA_DIR / "config" / "codexradar_watch.json"))
+# The independent local radar reader is a producer-owned runtime dependency.
+# Keep LOCAL_OPEN_SOURCE_RADAR_READER explicit; do not infer a local path here.
 sys.path.insert(0, str(MODULE_DIR))
 runpy.run_path(str(MODULE_DIR / "agents_radar_prefetch.py"), run_name="__main__")
 """

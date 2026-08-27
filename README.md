@@ -1,12 +1,14 @@
 # glance_brief
 
+当前版本：`0.2.5`
+
 `glance_brief` 每天帮你把值得看的 AI 动态和新闻整理成一份日报：先看重点，再按主题展开，想深究时直接回到原文核对。
 
 ## 两份日报
 
 ### `agents-report`：AI / Agents 生态日报
 
-面向想持续关注 AI 行业的人，聚合 AI 与 Agents 生态动态、论文、开源热点和模型效率信息，按「AI 生态动态 → 模型效率 → 开源热点趋势」的顺序呈现，适合快速了解行业变化和值得继续追踪的方向。
+面向想持续关注 AI 行业的人，聚合 AI 与 Agents 生态动态、论文、开源热点和模型效率信息，按「AI 生态动态 → 模型效率 → 开源热点趋势」的顺序呈现，适合快速了解行业变化和值得继续追踪的方向。开源热点由独立本地 GitHub 雷达采集并独立投递；本报告只消费当天结构化快照和本地报告使用的分类映射。
 
 ![agents-report 最终样式](docs/images/report-style-1.png)
 
@@ -30,7 +32,7 @@
 |---|---|
 | AI HOT（v1 全局精选 / public 兼容层） | agents-report · 🤖 AI 生态动态；noon-news · AI 主题 |
 | CodexRadar 效率快照 | agents-report · 🧠 CodexRadar 智力效率 |
-| agents-radar 生态日报（ai-trending） | agents-report · 🔥 开源热点趋势 |
+| 独立本地 GitHub 开源雷达（当天结构化快照） | agents-report · 🔥 开源热点趋势 |
 | news-aggregator-skill（HN / GitHub / 36Kr / 微博等 8 源） | noon-news · 今日要点 + 分类详情 |
 | news-summary RSS（国际源） | noon-news · 分类详情 |
 
@@ -91,7 +93,6 @@ python -m pip install -r requirements.txt
 
 - [news-aggregator-skill](https://github.com/cclank/news-aggregator-skill) — 新闻聚合来源
 - [AI HOT](https://aihot.virxact.com/)（skill 开源合集见 [khazix-skills](https://github.com/KKKKhazix/khazix-skills)）— AI 动态与日报来源
-- [agents-radar](https://github.com/duanyytop/agents-radar) — AI 生态日报与开源热点来源
 - [CodexRadar](https://codexradar.com/) — 模型效率快照来源
 
 ## 许可证

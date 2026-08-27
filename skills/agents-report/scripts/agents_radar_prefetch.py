@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-fetch agents-radar and AI HOT v1 data for cron formatting."""
+"""Pre-fetch current-day local radar, AI HOT, and CodexRadar data for formatting."""
 from __future__ import annotations
 
 import json
@@ -24,7 +24,7 @@ if str(QUALITY_MODULE_DIR) not in sys.path:
 from codexradar_efficiency import run_codexradar
 from open_source_quality import inspect_source_projects
 
-SCRIPT = Path(os.environ.get(
+LEGACY_SCRIPT = Path(os.environ.get(
     "AGENTS_RADAR_COLLECTOR",
     str(Path(__file__).with_name("agents-radar-daily.py")),
 ))
@@ -64,18 +64,18 @@ def python_with_modules(*modules: str) -> str:
     return sys.executable
 
 
-CMD = [
-    python_with_modules("feedparser"),
-    str(SCRIPT),
-    "--source",
-    "ai-trending",
-]
+def legacy_agents_radar_cmd() -> list[str]:
+    """Build the optional legacy command only when explicitly used."""
+    return [
+        python_with_modules("feedparser"),
+        str(LEGACY_SCRIPT),
+        "--source",
+        "ai-trending",
+    ]
 
-LOCAL_RADAR_SCRIPT = Path(os.environ.get(
-    "LOCAL_OPEN_SOURCE_RADAR_READER",
-    str(Path.home() / ".hermes" / "scripts" / "local-open-source-radar" / "read-current.py"),
-))
-LOCAL_READER_CMD = [sys.executable, str(LOCAL_RADAR_SCRIPT)]
+LOCAL_RADAR_READER = os.environ.get("LOCAL_OPEN_SOURCE_RADAR_READER", "").strip()
+LOCAL_RADAR_SCRIPT = Path(LOCAL_RADAR_READER).expanduser() if LOCAL_RADAR_READER else None
+LOCAL_READER_CMD = [sys.executable, str(LOCAL_RADAR_SCRIPT)] if LOCAL_RADAR_SCRIPT else []
 LOCAL_TIMEOUT = 240
 
 
@@ -94,6 +94,8 @@ def run_local_radar() -> dict:
         "instructions": "",
         "stderr": "",
     }
+    if LOCAL_RADAR_SCRIPT is None:
+        return {**base, "error": "local radar reader is not configured"}
     if not LOCAL_RADAR_SCRIPT.exists():
         return {**base, "error": f"missing {LOCAL_RADAR_SCRIPT}"}
 
@@ -246,13 +248,13 @@ def select_trending_body(raw: str) -> dict:
 
 
 def run_agents_radar() -> dict:
-    if not SCRIPT.exists():
+    if not LEGACY_SCRIPT.exists():
         return {
             "ok": False,
             "returncode": None,
             "attempts": 0,
             "stdout": "",
-            "stderr": f"missing {SCRIPT}",
+            "stderr": f"missing {LEGACY_SCRIPT}",
         }
 
     last_error = "unknown agents-radar error"
@@ -266,7 +268,7 @@ def run_agents_radar() -> dict:
                 str(Path.home() / ".cache" / "glance-brief" / "agents-radar"),
             )
             proc = subprocess.run(
-                CMD,
+                legacy_agents_radar_cmd(),
                 text=True,
                 capture_output=True,
                 timeout=AGENTS_TIMEOUT,

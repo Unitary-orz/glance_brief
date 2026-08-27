@@ -37,10 +37,7 @@ aihot
   api
   window
   categories
-    industry
-      ok
-      items[]
-    paper
+    <item.category>
       ok
       items[]
 codexradar
@@ -53,7 +50,7 @@ codexradar
 generated_at
 ```
 
-AI HOT 关键字段：
+AI HOT 的分类键来自每条条目的 `item.category`，是动态集合，不得在 Prompt 或契约中假定固定分类名称。
 
 - `items[*].links.aihot`：站内原文链接
 - `items[*].source.name`：来源名称
@@ -112,14 +109,18 @@ instructions
 - `BRIEF_TIMEZONE`
 - `NEWS_PYTHON`
 
-### agents-report
+### agents-report 主预取
+
+- `LOCAL_OPEN_SOURCE_RADAR_READER`（独立本地雷达 reader；必须由 runtime 配置，不提供机器相关默认路径）
+- `AIHOT_V1_BASE`
+- `AIHOT_USER_AGENT`
+- `CODEXRADAR_CONFIG`
+
+### agents-report 兼容工具
 
 - `AGENTS_RADAR_COLLECTOR`
 - `AGENTS_RADAR_FEED_URL`
 - `AGENTS_RADAR_OUTPUT_DIR`
-- `AIHOT_V1_BASE`
-- `AIHOT_USER_AGENT`
-- `CODEXRADAR_CONFIG`
 - `AGENTS_RADAR_QUALITY_CONFIG`
 - `AGENTS_RADAR_QUALITY_MODULE_DIR`（质量模块不与预取入口同目录时使用）
 - `AGENTS_RADAR_CRON_OUTPUT_DIR`（仅用于 `agents_radar_quality_check.py --latest`）

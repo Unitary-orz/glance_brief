@@ -2,7 +2,7 @@
 name: agents-report
 description: >-
   每日 AI / Agents 生态报告 Skill。
-  整合 agents-radar、AI HOT 和 CodexRadar 数据，输出 AI 生态动态、
+  整合 AI HOT、CodexRadar 和独立本地 GitHub 雷达数据，输出 AI 生态动态、
   模型效率和开源热点趋势。核心脚本可独立运行，定时投递由 runtime adapter 配置。
 triggers:
   - agents-report
@@ -23,8 +23,8 @@ python3 skills/agents-report/scripts/agents_radar_prefetch.py
 
 ## 脚本
 
-- `agents_radar_prefetch.py`：本地 GitHub 雷达、AI HOT 和 CodexRadar 预取编排；本地雷达只读取当天快照
-- `agents-radar-daily.py`：agents-radar RSS 原始采集器
+- `agents_radar_prefetch.py`：独立本地 GitHub 雷达 reader、AI HOT 和 CodexRadar 预取编排；本地雷达只读取当天快照
+- `agents-radar-daily.py`：兼容旧版 agents-radar RSS 采集器，不属于当前默认报告链路
 - `codexradar_efficiency.py`：CodexRadar 读取、排序和 Markdown 渲染
 - `open_source_quality.py`：离线检查来源项目链接、分类和数量约束
 - `agents_radar_quality_check.py`：检查来源文本或最终 Markdown 报告
@@ -51,7 +51,7 @@ config/codexradar_watch.json
 config/agents_radar_quality.json
 ```
 
-分别通过 `CODEXRADAR_CONFIG` 和 `AGENTS_RADAR_QUALITY_CONFIG` 指定。真实配置不要提交到公共仓库。
+分别通过 `CODEXRADAR_CONFIG` 和 `AGENTS_RADAR_QUALITY_CONFIG` 指定。完整开源热点板块还需要 runtime 提供 `LOCAL_OPEN_SOURCE_RADAR_READER`；它必须输出当天快照及经过校验的本地报告分类映射。核心脚本不为该 reader 提供机器相关默认路径。真实配置不要提交到公共仓库。
 
 ## 输出规则
 

@@ -23,19 +23,24 @@ $HERMES_HOME/data/glance-brief/
 └── install-manifest.json      # installed file hashes + job mapping
 ```
 
-Entry points are thin adapters: they resolve `$HERMES_HOME` (default
-`~/.hermes`), set the config/output environment variables, and execute the
-matching module under `lib/` with `runpy`. Business modules are never edited
-in place; a sync replaces them from the repository and verifies hashes.
+The entry point does not discover or collect the independent local radar. Set
+`LOCAL_OPEN_SOURCE_RADAR_READER` in the runtime environment to the producer's
+reader and, when required by that reader, set
+`LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR` to its rendered-report output directory.
+Do not put a local radar Job ID in the reusable business module.
 
 ## Environment
 
-The entry points set these variables with `os.environ.setdefault` when
-running; a user or scheduler may override them:
+The generic entry point sets only repository-relative defaults for the
+installed compatibility/configuration helpers. The independent local radar
+reader and its rendered-report directory are producer-owned runtime inputs
+and must be supplied by the selected runtime adapter:
 
 ```text
-AGENTS_RADAR_COLLECTOR            -> lib/agents-report/agents-radar-daily.py
-AGENTS_RADAR_OUTPUT_DIR           -> $HERMES_HOME/data/glance-brief/output/agents-radar
+LOCAL_OPEN_SOURCE_RADAR_READER -> configured reader supplied by the independent local radar
+LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR -> reader-specific rendered-report directory, if the reader needs it
+AGENTS_RADAR_COLLECTOR            -> legacy lib/agents-report/agents-radar-daily.py
+AGENTS_RADAR_OUTPUT_DIR           -> legacy collector output directory
 AGENTS_RADAR_QUALITY_CONFIG       -> $HERMES_HOME/data/glance-brief/config/agents_radar_quality.json
 AGENTS_RADAR_QUALITY_MODULE_DIR   -> lib/agents-report
 CODEXRADAR_CONFIG                 -> $HERMES_HOME/data/glance-brief/config/codexradar_watch.json

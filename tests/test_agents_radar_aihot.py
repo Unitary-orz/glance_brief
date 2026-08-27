@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -92,26 +93,42 @@ class AgentsRadarAIHOTTests(unittest.TestCase):
             stdout=json.dumps(payload),
             stderr="",
         )
-        with patch.object(
-            agents_prefetch.subprocess, "run", return_value=completed
-        ) as mocked_run:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reader = Path(tmpdir) / "reader.py"
+            reader.write_text("# offline fixture reader\n", encoding="utf-8")
+            with patch.object(agents_prefetch, "LOCAL_RADAR_SCRIPT", reader), patch.object(
+                agents_prefetch,
+                "LOCAL_READER_CMD",
+                ["configured-reader", str(reader)],
+            ), patch.object(
+                agents_prefetch.subprocess, "run", return_value=completed
+            ) as mocked_run:
+                result = agents_prefetch.run_local_radar()
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["source"], "local-open-source-radar")
+            self.assertEqual(
+                result["signals"]["hot_today"][0]["full_name"],
+                "Acme/agent-kit",
+            )
+            self.assertEqual(
+                result["local_report_categories"],
+                [{
+                    "name": "① 🤖 Agent / 技能 / 工作流",
+                    "projects": ["Acme/agent-kit"],
+                }],
+            )
+            command = mocked_run.call_args.args[0]
+            self.assertEqual(command, ["configured-reader", str(reader)])
+
+    def test_run_local_radar_fails_closed_without_reader_configuration(self):
+        with patch.object(agents_prefetch, "LOCAL_RADAR_SCRIPT", None), patch.object(
+            agents_prefetch, "LOCAL_READER_CMD", []
+        ):
             result = agents_prefetch.run_local_radar()
 
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["source"], "local-open-source-radar")
-        self.assertEqual(
-            result["signals"]["hot_today"][0]["full_name"],
-            "Acme/agent-kit",
-        )
-        self.assertEqual(
-            result["local_report_categories"],
-            [{
-                "name": "① 🤖 Agent / 技能 / 工作流",
-                "projects": ["Acme/agent-kit"],
-            }],
-        )
-        command = mocked_run.call_args.args[0]
-        self.assertTrue(command[1].endswith("local-open-source-radar/read-current.py"))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "local radar reader is not configured")
 
 
 if __name__ == "__main__":

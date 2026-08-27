@@ -7,12 +7,17 @@
 ## 分层
 
 ```text
-外部来源
+外部来源与独立报告
+  │
+  ├── 独立本地 GitHub 雷达：采集、筛选、排序并生成当天快照与报告
+  ├── AI HOT API
+  ├── CodexRadar snapshot / 原始评测表
+  └── news-aggregator / RSS collectors
   │
   ▼
 预取层（Python，输出 JSON）
   │
-  ├── agents-radar collector
+  ├── 本地雷达 reader：只读取 runtime 配置的当天快照与分类映射
   ├── AI HOT client
   ├── CodexRadar reader/ranker
   └── news-aggregator / RSS collectors
@@ -44,7 +49,7 @@ Runtime adapter
 
 预取脚本只负责：
 
-- 调用来源
+- 调用或读取已配置的来源 adapter
 - 重试和超时
 - 保留来源 URL 和原始字段
 - 返回成功 / 失败状态
@@ -78,7 +83,9 @@ Adapter 负责：
 - 本地配置路径
 - 模型和投递目标
 
-真实 Job ID、聊天 ID、模型和凭据不能进入通用 Skill。
+真实 Job ID、聊天 ID、模型和凭据不能进入通用 Skill。独立本地雷达的 reader、快照目录和本地报告目录同样由 runtime adapter 配置；业务模块只依赖结构化 reader 输出，不解析或猜测其他任务的调度信息。
+
+兼容保留的 `agents-radar-daily.py` 仅供旧版独立采集/质量检查工具使用，不在当前 agents-report 默认数据流中。
 
 ## 重要设计取舍
 
