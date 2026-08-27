@@ -47,7 +47,10 @@
     "value_price_bands": [
       {"max_price_usd": 0.30, "factor": 1.00},
       {"max_price_usd": 0.50, "factor": 0.98},
-      {"factor": 0.90}
+      {"max_price_usd": 1.00, "factor": 0.95},
+      {"max_price_usd": 3.00, "factor": 0.85},
+      {"max_price_usd": 5.00, "factor": 0.75},
+      {"factor": 0.65}
     ],
     "balanced_top_n": 2,
     "balanced_scope": "all_explicit_watch_configs",

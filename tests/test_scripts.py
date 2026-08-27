@@ -246,6 +246,53 @@ class CodexRadarTests(unittest.TestCase):
             ],
         )
 
+    def test_example_price_ladder_separates_expensive_models(self):
+        data = [
+            {
+                "model": "gpt-5.6-luna",
+                "effort": "max",
+                "iq": 95.5,
+                "price": 0.48,
+                "minutes": 33.2,
+                "combined_cost": 1.0,
+            },
+            {
+                "model": "gpt-5.5",
+                "effort": "xhigh",
+                "iq": 97.3,
+                "price": 5.57,
+                "minutes": 22.3,
+                "combined_cost": 1.0,
+            },
+            {
+                "model": "deepseek-v4-flash",
+                "effort": "max",
+                "iq": 85.3,
+                "price": 0.22,
+                "minutes": 31.6,
+                "combined_cost": 1.0,
+            },
+        ]
+        ranking = json.loads(
+            (ROOT / "skills/agents-report/config/codexradar_watch.example.json").read_text(
+                encoding="utf-8"
+            )
+        )["ranking"]
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        self.assertEqual(
+            [codexradar.value_price_factor(price, ranking) for price in (0.22, 0.48, 1.0, 3.0, 5.0, 5.01)],
+            [1.0, 0.98, 0.95, 0.85, 0.75, 0.65],
+        )
+        ranked = codexradar.rank_value(data, ranking, config)
+        self.assertEqual(
+            [(point["model"], point["effort"]) for point in ranked],
+            [
+                ("gpt-5.6-luna", "max"),
+                ("deepseek-v4-flash", "max"),
+                ("gpt-5.5", "xhigh"),
+            ],
+        )
+
     def test_restricted_value_scope_does_not_fallback_to_sol(self):
         data = [
             {

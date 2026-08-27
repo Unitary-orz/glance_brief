@@ -104,7 +104,7 @@ combined_cost_index = raw_combined_cost / 当前图表最高 raw_combined_cost �
 
 配置中保留 `selection.iq_filter.include_iq_at_least: 90` 作为未来筛选阈值，但 `selection.iq_filter.enabled` 当前为 `false`，因此暂时不会因为 IQ 达标而额外纳入模型。显式规则匹配后按 `(model, effort)` 去重。
 
-配置还保留 `ranking`：智力排行取 Top 2；均衡排行取 Top 2，计算范围为全部显式关注配置，不先排除已进入其他榜单的配置，使用 IQ、平均耗时、平均价格的百分位分数几何平均，平分时优先综合成本更低者；性价比 Top 3 只在非 Sol 显式关注配置中计算，先应用独立的 `IQ ≥ 70` 质量门槛，再按 `IQ / average_price_usd^0.25` 降序，时间和综合成本只作次级平分判断。非 Sol 候选为空时直接输出空榜，不回退引入 Sol；价格为 0 的配置作为免费项优先排序，并用 `value_is_free: true` 与 `value_score: null` 保持标准 JSON。这个门槛属于性价比排序，不等同于全局 IQ 筛选开关。榜单计算不互相排除；展示排版时，未进入任一 Top 榜的关注配置归入“其他”。综合成本沿用 CodexRadar 的价格/耗时权重；IQ 筛选阈值与这些排序分开，当前仍未启用。
+配置还保留 `ranking`：智力排行取 Top 2；均衡排行取 Top 2，计算范围为全部显式关注配置，不先排除已进入其他榜单的配置，使用 IQ、平均耗时、平均价格的百分位分数几何平均，平分时优先综合成本更低者；性价比 Top 3 只在非 Sol 显式关注配置中计算，先应用独立的 `IQ ≥ 70` 质量门槛，再按 `IQ × price_factor` 降序；`price_factor` 由 `ranking.value_price_bands` 提供，当前为 `≤$0.30 → 1.00`、`>$0.30–$0.50 → 0.98`、`>$0.50–$1 → 0.95`、`>$1–$3 → 0.85`、`>$3–$5 → 0.75`、`>$5 → 0.65`；时间和综合成本只作次级平分判断。非 Sol 候选为空时直接输出空榜，不回退引入 Sol；价格为 0 的配置作为免费项优先排序，并用 `value_is_free: true` 与 `value_score: null` 保持标准 JSON。这个门槛属于性价比排序，不等同于全局 IQ 筛选开关。榜单计算不互相排除；展示排版时，未进入任一 Top 榜的关注配置归入“其他”。综合成本沿用 CodexRadar 的价格/耗时权重；IQ 筛选阈值与这些排序分开，当前仍未启用。
 
 “其他”不做 IQ 或性价比排名，按模型顺序 `Sol → Luna → gpt-5.5 → DeepSeek V4`，同一模型内按 effort 顺序排列，只用分号分隔。
 
