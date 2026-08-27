@@ -2,17 +2,21 @@
 
 当前版本：`0.2.5`
 
-`glance_brief` 每天帮你把值得看的 AI 动态和新闻整理成一份日报：先看重点，再按主题展开，想深究时直接回到原文核对。
+`glance_brief` 每天帮你把值得看的 AI 动态和新闻整理成几份日报：先看重点，再按主题展开，想深究时直接回到原文核对。
 
-## 两份日报
+## 三份日报
 
 ### `agents-report`：AI / Agents 生态日报
 
-面向想持续关注 AI 行业的人，聚合 AI 与 Agents 生态动态、论文、开源热点和模型效率信息，按「AI 生态动态 → 模型效率 → 开源热点趋势」的顺序呈现，适合快速了解行业变化和值得继续追踪的方向。开源热点由独立本地 GitHub 雷达采集并独立投递；本报告只消费当天结构化快照和本地报告使用的分类映射。
+面向想持续关注 AI 行业的人，聚合 AI 与 Agents 生态动态、论文、开源热点和模型效率信息，按「AI 生态动态 → 模型效率 → 开源热点趋势」的顺序呈现，适合快速了解行业变化和值得继续追踪的方向。开源热点来源已从 `agents-radar` 调整为独立的本地 GitHub 开源雷达。
 
 ![agents-report 最终样式](docs/images/report-style-1.png)
 
 [查看 agents-report 安装说明](skills/agents-report/INSTALL.md)
+
+### `local-open-source-radar`：本地开源雷达日报
+
+独立整理 GitHub 上值得关注的 AI 开源项目，提供更完整的热门项目、趋势变化和分类观察；`agents-report` 会从这份日报中提炼开源热点。
 
 ### `noon-news`：午间热点简报
 
@@ -24,17 +28,19 @@
 
 ## 内容治理规则
 
-两份日报采用同一种阅读节奏：**先看结论，再按主题展开，最后核对来源。** 具体渲染以"两份日报"的示例图为准。
+三份日报共享同一种阅读节奏：**先看结论，再按主题展开，最后核对来源。** 具体渲染以各自的示例图和安装说明为准。
 
-采纳的第三方模块与最终输出板块：
+当前数据来源与最终输出板块：
 
-| 第三方模块 | 输出板块 |
+| 数据来源 / 模块 | 输出板块 |
 |---|---|
 | AI HOT（v1 全局精选 / public 兼容层） | agents-report · 🤖 AI 生态动态；noon-news · AI 主题 |
 | CodexRadar 效率快照 | agents-report · 🧠 CodexRadar 智力效率 |
 | 独立本地 GitHub 开源雷达（当天结构化快照） | agents-report · 🔥 开源热点趋势 |
 | news-aggregator-skill（HN / GitHub / 36Kr / 微博等 8 源） | noon-news · 今日要点 + 分类详情 |
 | news-summary RSS（国际源） | noon-news · 分类详情 |
+
+本版本新增独立的本地开源雷达日报，同时将 `agents-report` 的开源热点来源从 `agents-radar` 调整为本地 GitHub 开源雷达；两份报告共享同一批热门项目和分类结果。
 
 来源与样式规则：
 
