@@ -29,7 +29,7 @@ python3 skills/noon-news/scripts/noon_news_prefetch.py
 2. news-summary RSS
 3. AI HOT v1 全局精选（`/api/v1/items`，默认 `mode=selected&window=24h&by=timeline`）
 
-AI HOT 条目使用 v1 字段：媒体名取 `source.name`，原文链接取 `links.original`，AI HOT 链接取 `links.aihot`；分页信息取 `page.count`、`page.hasMore` 和 `page.nextCursor`。
+AI HOT 条目使用 v1 字段：媒体名取 `source.name`，AI HOT 条目页取 `links.aihot`，原文媒体取 `links.original`；可见来源行必须把这两条链接分别嵌入，不能合并到一个链接中。分页信息取 `page.count`、`page.hasMore` 和 `page.nextCursor`。
 
 外部脚本通过环境变量指定，不写死 OpenClaw 或 Hermes 路径。
 
@@ -42,7 +42,7 @@ prompts/news-brief-v2.md
 v2/prompts/noon-news.md
 ```
 
-V1 的格式规则保持不变：每条详情固定为连续三行——第 1 行只写原文标题（英文标题可带中文对照翻译），第 2 行只写一句事实描述，第 3 行只写来源引用；禁止把标题与描述合并为“标题：描述”。来源单独一行用引用块（`> 来源：`），不并入事实描述行；链接以 Markdown 嵌入、正文不显示 URL 明文。标题保留脚本原始 `title`：只有英文原始标题才在后面加中文对照翻译括号，中文、日文等非英文标题直接写原题、不加翻译括号。来源链接文字内冒号替换为 `•`（内容保留）、`公众号` 统一替换为 `WX`；所有来源用 `•` 连接，同渠道去重（渠道只写一次），每条最多 2 个渠道，超过时只保留前 2 个并加 `+N`。只增加链接时不得改动标题、章节或换行结构。完整 V1 规则以 `prompts/news-brief-v2.md` 为唯一格式来源。
+V1 的格式规则保持不变：每条详情固定为连续三行——第 1 行只写原文标题（英文标题可带中文对照翻译），第 2 行只写一句事实描述，第 3 行只写来源引用；禁止把标题与描述合并为“标题：描述”。来源单独一行用引用块（`> 来源：`），不并入事实描述行；链接以 Markdown 嵌入、正文不显示 URL 明文。标题保留脚本原始 `title`：只有英文原始标题才在后面加中文对照翻译括号，中文、日文等非英文原始标题直接写原题、不加翻译括号。来源链接文字按层级使用分隔符：平台/渠道名与其子板块、栏目或账号名之间统一使用空格（如 `TechCrunch：AI` / `TechCrunch•AI` → `TechCrunch AI`、`WX・智谱（GLM）` / `公众号：智谱（GLM）` → `WX 智谱（GLM）`）；不同来源、渠道之间以及同一渠道的多个媒体之间使用 `•`；`公众号` 统一替换为 `WX`；不同来源、渠道之间以及同一渠道的多个媒体之间用 `•` 连接，平台/渠道名与其子板块、栏目或账号名之间用空格；同渠道去重（渠道只写一次），每条最多 2 个报告渠道，超过时只保留前 2 个并加 `+N`。AI HOT 若同时有 `links.aihot` 和 `links.original`，来源行写成 `[AIHOT](links.aihot)•[原文媒体](links.original)`，两条链接必须分开；只增加链接时不得改动标题、章节或换行结构。完整 V1 规则以 `prompts/news-brief-v2.md` 为唯一格式来源。
 
 独立 V2 使用精简模型契约 → `glance_brief.noon-news.v2` 两层流程。模型只返回单个候选 ID、摘要、可选中文对照翻译和全局要点排序；不再返回 `item_ref`、影响说明或证据等级，也不合并多个候选。程序负责回填标题、来源、URL、发布时间、稳定 `item_id`，并只做必要的结构与引用校验。超过 5 条要点取前 5 条，重复或未绑定要点忽略；数字等价写法、摘要长度和额外无害字段不再阻断整份报告。不要把 V2 的语义 JSON 与 `evaluate_outputs.py` 的质量评估结果混用。旧的 `glance_brief.noon-news.model.v2` 仅用于历史离线 fixture 兼容。
 
