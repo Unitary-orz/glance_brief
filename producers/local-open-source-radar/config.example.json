@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "topics": [
+    "llm",
+    "ai-agent",
+    "rag",
+    "vector-database",
+    "large-language-model",
+    "machine-learning"
+  ],
+  "search": {
+    "active_days": 7,
+    "new_project_days": 30,
+    "new_project_min_stars": 20,
+    "per_page": 15,
+    "exclude_archived": true,
+    "exclude_forks": true,
+    "timeout_seconds": 20,
+    "attempts": 2
+  },
+  "quality": {
+    "min_trending_count": 5,
+    "min_search_result_count": 20
+  },
+  "state": {
+    "retention_days": 90
+  },
+  "technical_analysis": {
+    "enabled": true,
+    "cache_version": 3,
+    "max_projects": 3,
+    "timeout_seconds": 7,
+    "attempts": 1,
+    "cache_dir": "cache",
+    "max_file_chars": 6000,
+    "readme_excerpt_chars": 3000,
+    "evidence_file_limit": 2,
+    "max_manifest_files": 3,
+    "key_path_limit": 20,
+    "key_path_prefixes": [
+      "src/",
+      "app/",
+      "server/",
+      "packages/",
+      "crates/"
+    ],
+    "manifest_filenames": [
+      "pyproject.toml",
+      "requirements.txt",
+      "package.json",
+      "pnpm-workspace.yaml",
+      "go.mod",
+      "Cargo.toml",
+      "Gemfile",
+      "pom.xml",
+      "build.gradle",
+      "Dockerfile",
+      "docker-compose.yml"
+    ],
+    "framework_keywords": {
+      "FastAPI": [
+        "fastapi"
+      ],
+      "Django": [
+        "django"
+      ],
+      "Flask": [
+        "flask"
+      ],
+      "PyTorch": [
+        "pytorch",
+        "torch"
+      ],
+      "Transformers": [
+        "transformers",
+        "huggingface"
+      ],
+      "LangChain": [
+        "langchain"
+      ],
+      "LlamaIndex": [
+        "llamaindex",
+        "llama-index"
+      ],
+      "vLLM": [
+        "vllm"
+      ],
+      "llama.cpp": [
+        "llama.cpp"
+      ],
+      "MLX": [
+        "mlx"
+      ],
+      "ONNX Runtime": [
+        "onnxruntime",
+        "onnx runtime"
+      ],
+      "TensorFlow": [
+        "tensorflow"
+      ],
+      "JAX": [
+        "jax"
+      ],
+      "React": [
+        "react"
+      ],
+      "Next.js": [
+        "next.js",
+        "nextjs"
+      ]
+    },
+    "route_keywords": {
+      "Agent 编排": [
+        "agent loop",
+        "multi-agent",
+        "orchestration",
+        "tool calling",
+        "function calling"
+      ],
+      "RAG/知识检索": [
+        "retrieval augmented",
+        "vector database",
+        "embedding",
+        "knowledge base"
+      ],
+      "本地推理": [
+        "local inference",
+        "on-device",
+        "gguf",
+        "llama.cpp",
+        "mlx"
+      ],
+      "模型服务": [
+        "model serving",
+        "inference server",
+        "openai-compatible"
+      ],
+      "训练/微调": [
+        "fine-tuning",
+        "finetuning",
+        "lora",
+        "qlora"
+      ],
+      "长期记忆": [
+        "long-term memory",
+        "persistent memory",
+        "memory store"
+      ],
+      "工作流自动化": [
+        "workflow automation",
+        "mcp server",
+        "agent skill"
+      ],
+      "多模态": [
+        "multimodal",
+        "vision-language",
+        "image generation",
+        "speech"
+      ]
+    }
+  },
+  "relevance_keywords": [
+    "ai",
+    "agent",
+    "agentic",
+    "llm",
+    "language model",
+    "machine learning",
+    "deep learning",
+    "neural",
+    "rag",
+    "retrieval",
+    "embedding",
+    "vector",
+    "transformer",
+    "inference",
+    "model",
+    "mcp",
+    "skill",
+    "prompt",
+    "computer vision",
+    "generative",
+    "diffusion"
+  ],
+  "relevance_aliases": {
+    "coding_agents": [
+      "claude code",
+      "codex",
+      "opencode"
+    ]
+  },
+  "relevance_exclude_keywords": [
+    "awesome list",
+    "curated list",
+    "interview questions"
+  ],
+  "ranking": {
+    "today_star_weight": 1.0,
+    "snapshot_delta_weight": 0.8,
+    "trending_bonus": 80,
+    "new_source_bonus": 120,
+    "new_repo_age_days": 30,
+    "new_repo_bonus": 100,
+    "max_candidates": 30
+  },
+  "categories": [
+    {
+      "id": "agents",
+      "label": "🤖 AI 智能体/工作流",
+      "keywords": [
+        "agent",
+        "agentic",
+        "workflow",
+        "multi-agent",
+        "mcp",
+        "skill",
+        "automation"
+      ]
+    },
+    {
+      "id": "rag",
+      "label": "🔍 RAG/知识库",
+      "keywords": [
+        "rag",
+        "retrieval",
+        "vector",
+        "embedding",
+        "knowledge",
+        "memory"
+      ]
+    },
+    {
+      "id": "models",
+      "label": "🧠 大模型/训练",
+      "keywords": [
+        "model",
+        "llm",
+        "transformer",
+        "training",
+        "fine-tun",
+        "diffusion",
+        "neural"
+      ]
+    },
+    {
+      "id": "applications",
+      "label": "📦 AI 应用",
+      "keywords": [
+        "assistant",
+        "chat",
+        "finance",
+        "video",
+        "image",
+        "search",
+        "browser",
+        "coding"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "label": "🔧 AI 基础工具",
+      "keywords": [
+        "framework",
+        "sdk",
+        "inference",
+        "serving",
+        "runtime",
+        "cli",
+        "gateway",
+        "tool"
+      ]
+    }
+  ],
+  "output": {
+    "top_hot": 10,
+    "top_new": 2,
+    "top_fresh_hot": 3,
+    "fresh_hot_days": 7,
+    "new_project_history_days": 30,
+    "category_limit": 5
+  }
+}

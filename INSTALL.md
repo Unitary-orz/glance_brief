@@ -16,6 +16,11 @@ Two installable reports:
 - `agents-report` — AI / Agents ecosystem daily report
 - `noon-news` — midday news briefing
 
+The repository also contains the source for the independent
+`local-open-source-radar` producer. It is kept separate from the report
+components and is not installed or scheduled by this root installer; see
+`producers/local-open-source-radar/INSTALL.md` for its runtime contract.
+
 Supported runtime: `hermes`. Files are placed under the runtime home
 (`$HERMES_HOME`, default `~/.hermes`):
 

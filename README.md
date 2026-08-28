@@ -18,6 +18,8 @@
 
 独立整理 GitHub 上值得关注的 AI 开源项目，提供更完整的热门项目、趋势变化和分类观察；`agents-report` 会从这份日报中提炼开源热点。
 
+本报告的 producer 源码和运行说明见 [local-open-source-radar producer](producers/local-open-source-radar/INSTALL.md)；它不属于根安装器默认安装的报告组件。
+
 ### `noon-news`：午间热点简报
 
 面向想快速了解当天新闻的人，先给出 4–5 条今日要点，再按国际、商业、AI 等主题展开分类详情。每条新闻保留原始来源，方便直接点开继续阅读。
