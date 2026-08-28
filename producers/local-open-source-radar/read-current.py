@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,15 +24,7 @@ DATA_ROOT = Path(
 OUTPUT_DIR = Path(
     os.environ.get("LOCAL_OPEN_SOURCE_RADAR_OUTPUT_DIR", str(DATA_ROOT / "output"))
 ).expanduser()
-LOCAL_REPORT_OUTPUT_DIR_VALUE = os.environ.get("LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR", "").strip()
-LOCAL_REPORT_OUTPUT_DIR = (
-    Path(LOCAL_REPORT_OUTPUT_DIR_VALUE).expanduser()
-    if LOCAL_REPORT_OUTPUT_DIR_VALUE
-    else None
-)
 TODAY = datetime.now(tz=ZoneInfo("Asia/Shanghai")).date().isoformat()
-MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\((https://github\.com/[^)\s]+)\)")
-CATEGORY_HEADING_RE = re.compile(r"^\s*[①②③④⑤⑥⑦⑧⑨⑩]\s+.+$")
 
 
 def fail(message: str) -> int:
@@ -66,64 +57,41 @@ def validate_signals(signals: object) -> bool:
     return fresh_names.issubset(hot_names)
 
 
-def read_local_report_categories(hot_names: set[str]) -> list[dict[str, object]] | None:
-    """Extract and validate today's category/project mapping from the local report."""
-    if LOCAL_REPORT_OUTPUT_DIR is None or not LOCAL_REPORT_OUTPUT_DIR.exists():
+def build_local_report_categories(
+    categories: object,
+    hot_names: set[str],
+) -> list[dict[str, object]] | None:
+    """Convert the snapshot's structured category mapping to report sections."""
+    if not isinstance(categories, dict) or not categories:
         return None
 
-    for path in sorted(LOCAL_REPORT_OUTPUT_DIR.glob("*.md"), reverse=True):
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        marker = f"📡 **本地开源雷达｜{TODAY}**"
-        marker_index = text.find(marker)
-        if marker_index < 0:
-            continue
-        report = text[marker_index:]
-        start = report.find("**🚀 今日热门**")
-        if start < 0:
-            continue
-        end_candidates = [
-            index for index in (
-                report.find("**🌱 新项目发现**", start),
-                report.find("> 本次独立采集", start),
-            )
-            if index >= 0
-        ]
-        end = min(end_candidates) if end_candidates else len(report)
-        hot_section = report[start:end]
+    normalized: list[dict[str, object]] = []
+    covered: set[str] = set()
+    for name, items in categories.items():
+        if not isinstance(name, str) or not name or not isinstance(items, list):
+            return None
+        projects: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                return None
+            full_name = item.get("full_name")
+            url = item.get("url", f"https://github.com/{full_name}")
+            if (
+                not isinstance(full_name, str)
+                or not full_name
+                or url != f"https://github.com/{full_name}"
+                or full_name not in hot_names
+                or full_name in covered
+            ):
+                return None
+            projects.append(full_name)
+            covered.add(full_name)
+        if projects:
+            normalized.append({"name": name, "projects": projects})
 
-        categories: list[dict[str, object]] = []
-        current: dict[str, object] | None = None
-        seen: set[str] = set()
-        invalid = False
-        for line in hot_section.splitlines():
-            if CATEGORY_HEADING_RE.match(line):
-                current = {"name": line.strip(), "projects": []}
-                categories.append(current)
-                continue
-            if current is None:
-                continue
-            for match in MARKDOWN_LINK_RE.finditer(line):
-                full_name, url = match.groups()
-                if url != f"https://github.com/{full_name}" or full_name not in hot_names:
-                    invalid = True
-                    continue
-                projects = current["projects"]
-                assert isinstance(projects, list)
-                if full_name not in seen:
-                    projects.append(full_name)
-                    seen.add(full_name)
-
-        covered = {
-            full_name
-            for category in categories
-            for full_name in category["projects"]
-        }
-        if categories and not invalid and covered == hot_names:
-            return categories
-    return None
+    if not normalized or covered != hot_names:
+        return None
+    return normalized
 
 
 def main() -> int:
@@ -138,6 +106,8 @@ def main() -> int:
 
     if not isinstance(report, dict):
         return fail("today's local radar snapshot is not a JSON object")
+    if report.get("schema_version") != 1:
+        return fail("today's local radar snapshot has unsupported schema_version")
     if report.get("report_date") != TODAY:
         return fail(
             f"local radar snapshot date mismatch: expected {TODAY}, "
@@ -150,16 +120,19 @@ def main() -> int:
     if not validate_signals(signals):
         return fail("today's local radar snapshot has invalid signals/provenance")
     hot_names = {item["full_name"] for item in signals["hot_today"]}
-    local_report_categories = read_local_report_categories(hot_names)
+    categories = report.get("categories")
+    local_report_categories = build_local_report_categories(categories, hot_names)
     if local_report_categories is None:
-        return fail("today's local radar report has missing or invalid category mapping")
+        return fail("today's local radar snapshot has missing or invalid category mapping")
 
     slim = {
+        "schema_version": report["schema_version"],
         "report_date": report["report_date"],
         "generated_at": report.get("generated_at"),
         "diagnostics": report.get("diagnostics", {}),
         "quality": quality,
         "signals": signals,
+        "categories": categories,
         "local_report_categories": local_report_categories,
         "instructions": report.get("instructions", ""),
     }

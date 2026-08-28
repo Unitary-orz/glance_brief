@@ -55,9 +55,9 @@ Use `adapters/hermes/` or `adapters/openclaw/` to provide:
 
 The reader integration is deliberately explicit. The core script does not
 search Hermes/OpenClaw directories or infer a producer Job ID. Configure the
-reader supplied by the independent local radar; if that reader parses the
-independently delivered Markdown report, configure its report directory in the
-runtime environment as well.
+reader supplied by the independent local radar; it must return the current
+structured snapshot and derive `local_report_categories` from its `categories`
+mapping. No rendered Markdown report directory is needed.
 
 ## Verification
 

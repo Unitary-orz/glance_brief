@@ -6,7 +6,6 @@ This directory describes the runtime boundary for OpenClaw. The business scripts
 
 ```bash
 export LOCAL_OPEN_SOURCE_RADAR_READER="/path/to/local-radar-reader.py"
-export LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR="/path/to/local-radar-report-output"
 export CODEXRADAR_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/codexradar_watch.json"
 export AGENTS_RADAR_QUALITY_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/agents_radar_quality.json"
 export AGENTS_RADAR_QUALITY_MODULE_DIR="$OPENCLAW_WORKSPACE/skills/agents-report/scripts"

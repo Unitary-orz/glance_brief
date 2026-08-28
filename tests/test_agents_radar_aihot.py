@@ -83,10 +83,11 @@ class AgentsRadarAIHOTTests(unittest.TestCase):
                 "fresh_hot": [],
                 "new_projects": [],
             },
-            "local_report_categories": [{
-                "name": "① 🤖 Agent / 技能 / 工作流",
-                "projects": ["Acme/agent-kit"],
-            }],
+            "categories": {
+                "① 🤖 Agent / 技能 / 工作流": [{
+                    "full_name": "Acme/agent-kit",
+                }],
+            },
         }
         completed = SimpleNamespace(
             returncode=0,
@@ -102,24 +103,55 @@ class AgentsRadarAIHOTTests(unittest.TestCase):
                 ["configured-reader", str(reader)],
             ), patch.object(
                 agents_prefetch.subprocess, "run", return_value=completed
-            ) as mocked_run:
+            ) as mocked_subprocess:
+                with patch.object(
+                    agents_prefetch,
+                    "current_beijing_date",
+                    return_value="2026-08-27",
+                    create=True,
+                ):
+                    result = agents_prefetch.run_local_radar()
+
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["source"], "local-open-source-radar")
+                self.assertEqual(
+                    result["signals"]["hot_today"][0]["full_name"],
+                    "Acme/agent-kit",
+                )
+                self.assertEqual(
+                    result["local_report_categories"],
+                    [{
+                        "name": "① 🤖 Agent / 技能 / 工作流",
+                        "projects": ["Acme/agent-kit"],
+                    }],
+                )
+                command = mocked_subprocess.call_args.args[0]
+                self.assertEqual(command, ["configured-reader", str(reader)])
+
+    def test_run_local_radar_rejects_stale_reader_snapshot(self):
+        payload = {
+            "ok": True,
+            "report_date": "2026-08-27",
+            "quality": {"ok": True},
+            "signals": {"hot_today": [], "fresh_hot": [], "new_projects": []},
+            "categories": {},
+        }
+        completed = SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reader = Path(tmpdir) / "reader.py"
+            reader.write_text("# offline fixture reader\n", encoding="utf-8")
+            with patch.object(agents_prefetch, "LOCAL_RADAR_SCRIPT", reader), patch.object(
+                agents_prefetch, "LOCAL_READER_CMD", ["configured-reader", str(reader)]
+            ), patch.object(
+                agents_prefetch.subprocess, "run", return_value=completed
+            ), patch.object(
+                agents_prefetch, "current_beijing_date", return_value="2026-08-28", create=True
+            ):
                 result = agents_prefetch.run_local_radar()
 
-            self.assertTrue(result["ok"])
-            self.assertEqual(result["source"], "local-open-source-radar")
-            self.assertEqual(
-                result["signals"]["hot_today"][0]["full_name"],
-                "Acme/agent-kit",
-            )
-            self.assertEqual(
-                result["local_report_categories"],
-                [{
-                    "name": "① 🤖 Agent / 技能 / 工作流",
-                    "projects": ["Acme/agent-kit"],
-                }],
-            )
-            command = mocked_run.call_args.args[0]
-            self.assertEqual(command, ["configured-reader", str(reader)])
+        self.assertFalse(result["ok"])
+        self.assertIn("date mismatch", result["error"])
+        self.assertIn("2026-08-28", result["error"])
 
     def test_run_local_radar_fails_closed_without_reader_configuration(self):
         with patch.object(agents_prefetch, "LOCAL_RADAR_SCRIPT", None), patch.object(

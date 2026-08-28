@@ -49,12 +49,11 @@ LOCAL_OPEN_SOURCE_RADAR_DATA_DIR
 LOCAL_OPEN_SOURCE_RADAR_CONFIG
 LOCAL_OPEN_SOURCE_RADAR_STATE
 LOCAL_OPEN_SOURCE_RADAR_OUTPUT_DIR
-LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR
 ```
 
-`LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR` is optional and is used by
-`read-current.py` to validate the category/project mapping in the independent
-Markdown report.
+`read-current.py` reads the producer snapshot directly. Its structured
+`categories` mapping is the source for the report category/project mapping; no
+rendered Markdown report directory is required.
 
 ## GitHub access
 

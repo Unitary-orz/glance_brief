@@ -29,6 +29,9 @@ local_radar
     hot_today[]
     fresh_hot[]
     new_projects[]
+  categories
+    <category label>[]
+      full_name
   local_report_categories[]
     name
     projects[]
@@ -56,7 +59,7 @@ AI HOT 的分类键来自每条条目的 `item.category`，是动态集合，不
 - `items[*].source.name`：来源名称
 - `page.count` / `page.hasMore`：分页信息
 
-`local_radar` 是独立本地 GitHub 雷达的当天结构化事实源；`signals.hot_today` 是唯一热门项目池，`fresh_hot` 必须是其子集。`local_report_categories` 是当天本地报告最终使用的分类—项目映射，分类标题和项目归属由消费者逐字复用，不得由模型重新分类。该映射必须覆盖 `hot_today`，否则开源板块闭锁，不回退昨天、不重新采集、也不自行补写项目。
+`local_radar` 是独立本地 GitHub 雷达的当天结构化事实源；`signals.hot_today` 是唯一热门项目池，`fresh_hot` 必须是其子集。`categories` 是 producer 对 `hot_today` 的结构化分类映射；reader 从它派生 `local_report_categories`，分类标题和项目归属由消费者逐字复用，不得由模型重新分类。该映射必须覆盖 `hot_today`，否则开源板块闭锁，不回退昨天、不重新采集、也不自行补写项目。reader 不得依赖独立投送的 Markdown 报告。
 
 采集器只把 HTTP(S) 来源锚点保留为 Markdown；最终项目质量检查再按 `project_link_prefix` 验收仓库链接，默认只接受 `https://github.com/`。检查器解析所有 Markdown 目标后统一拒绝其他协议或前缀，并核对标签中的 `owner/repo` 与 URL 仓库路径。`AGENTS_RADAR_CRON_OUTPUT_DIR` 非空时优先于 JSON 中的 `cron_output_dir`，避免复制示例配置后 `--latest` 仍指向占位路径。
 
@@ -94,6 +97,7 @@ instructions
 
 ```json
 {
+  "schema_version": 1,
   "ok": false,
   "error": "source unavailable",
   "items": []

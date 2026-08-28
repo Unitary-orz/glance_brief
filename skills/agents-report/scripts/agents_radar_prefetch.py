@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 QUALITY_MODULE_DIR = Path(os.environ.get(
     "AGENTS_RADAR_QUALITY_MODULE_DIR",
@@ -79,6 +80,47 @@ LOCAL_READER_CMD = [sys.executable, str(LOCAL_RADAR_SCRIPT)] if LOCAL_RADAR_SCRI
 LOCAL_TIMEOUT = 240
 
 
+def current_beijing_date() -> str:
+    return datetime.now(tz=ZoneInfo("Asia/Shanghai")).date().isoformat()
+
+
+def build_local_report_categories(
+    categories: object,
+    hot_names: set[str],
+) -> list[dict[str, object]] | None:
+    """Normalize producer categories without consulting rendered Markdown."""
+    if not isinstance(categories, dict) or not categories:
+        return None
+
+    normalized: list[dict[str, object]] = []
+    covered: set[str] = set()
+    for name, items in categories.items():
+        if not isinstance(name, str) or not name.strip() or not isinstance(items, list):
+            return None
+        projects: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                return None
+            full_name = item.get("full_name")
+            url = item.get("url", f"https://github.com/{full_name}")
+            if (
+                not isinstance(full_name, str)
+                or not full_name
+                or url != f"https://github.com/{full_name}"
+                or full_name not in hot_names
+                or full_name in covered
+            ):
+                return None
+            projects.append(full_name)
+            covered.add(full_name)
+        if projects:
+            normalized.append({"name": name, "projects": projects})
+
+    if not normalized or covered != hot_names:
+        return None
+    return normalized
+
+
 def run_local_radar() -> dict:
     """Read the local radar's trusted current-day snapshot."""
     base = {
@@ -90,6 +132,7 @@ def run_local_radar() -> dict:
         "diagnostics": {},
         "quality": {},
         "signals": {},
+        "categories": {},
         "local_report_categories": [],
         "instructions": "",
         "stderr": "",
@@ -123,6 +166,16 @@ def run_local_radar() -> dict:
     if not isinstance(payload, dict):
         return {**result, "error": "invalid local radar JSON: expected object"}
 
+    expected_date = current_beijing_date()
+    if payload.get("report_date") != expected_date:
+        return {
+            **result,
+            "error": (
+                "local radar snapshot date mismatch: "
+                f"expected {expected_date}, got {payload.get('report_date')!r}"
+            ),
+        }
+
     signals = payload.get("signals")
     quality = payload.get("quality")
     if not isinstance(signals, dict) or not isinstance(quality, dict):
@@ -152,6 +205,8 @@ def run_local_radar() -> dict:
         return {**result, "error": "invalid local radar payload: fresh_hot is not a hot_today subset"}
 
     local_report_categories = payload.get("local_report_categories")
+    if local_report_categories is None:
+        local_report_categories = build_local_report_categories(payload.get("categories"), hot_names)
     if not isinstance(local_report_categories, list) or not local_report_categories:
         return {**result, "error": "invalid local radar payload: missing local report categories"}
     category_projects = []
@@ -177,6 +232,7 @@ def run_local_radar() -> dict:
         "diagnostics": payload.get("diagnostics", {}),
         "quality": quality,
         "signals": normalized_signals,
+        "categories": payload.get("categories", {}),
         "local_report_categories": local_report_categories,
         "instructions": str(payload.get("instructions", "")),
     }

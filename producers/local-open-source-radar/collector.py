@@ -326,12 +326,21 @@ def rank_candidates(
     )[: int(weights["max_candidates"])]
 
 
-def categorize(candidates: list[dict[str, Any]], config: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def categorize(
+    candidates: list[dict[str, Any]],
+    config: dict[str, Any],
+    *,
+    max_per_category: int | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     categories = config.get("categories", [])
     output = {category["label"]: [] for category in categories}
     fallback = "其他"
     output[fallback] = []
-    limit = int(config.get("output", {}).get("category_limit", 5))
+    limit = (
+        int(config.get("output", {}).get("category_limit", 5))
+        if max_per_category is None
+        else max(0, int(max_per_category))
+    )
     for item in candidates:
         blob = _text_blob(item)
         label = fallback
@@ -572,6 +581,51 @@ def resolve_data_path(value: str | Path, data_root: Path = DATA_ROOT) -> Path:
     """Resolve a configured path, keeping relative paths inside the data root."""
     path = Path(str(value)).expanduser()
     return path if path.is_absolute() else data_root / path
+
+
+def _path_from_env(name: str) -> Path | None:
+    value = os.environ.get(name, "").strip()
+    return Path(value).expanduser() if value else None
+
+
+def _data_root_from_path(path: Path, kind: str) -> Path:
+    if kind in {"config", "state"}:
+        return path.parent.parent if path.parent.name == kind else path.parent
+    return path.parent if path.name == "output" else path.parent
+
+
+def resolve_runtime_paths(args: argparse.Namespace) -> dict[str, Path]:
+    """Resolve CLI/runtime paths and use their data root for relative caches."""
+    cli_paths = {
+        "config": getattr(args, "config", None),
+        "state": getattr(args, "state", None),
+        "output_dir": getattr(args, "output_dir", None),
+    }
+    env_paths = {
+        "config": _path_from_env("LOCAL_OPEN_SOURCE_RADAR_CONFIG"),
+        "state": _path_from_env("LOCAL_OPEN_SOURCE_RADAR_STATE"),
+        "output_dir": _path_from_env("LOCAL_OPEN_SOURCE_RADAR_OUTPUT_DIR"),
+    }
+    explicit = {
+        name: Path(str(value)).expanduser()
+        for name, value in cli_paths.items()
+        if value is not None
+    }
+    configured = explicit or {
+        name: value for name, value in env_paths.items() if value is not None
+    }
+    data_root = DATA_ROOT
+    for name in ("config", "state", "output_dir"):
+        if name in configured:
+            data_root = _data_root_from_path(configured[name], name)
+            break
+
+    return {
+        "data_root": data_root,
+        "config": explicit.get("config") or env_paths["config"] or data_root / "config" / "config.json",
+        "state": explicit.get("state") or env_paths["state"] or data_root / "state" / "state.json",
+        "output_dir": explicit.get("output_dir") or env_paths["output_dir"] or data_root / "output",
+    }
 
 
 def _technical_cache_path(cache_dir: Path, full_name: str) -> Path:
@@ -865,7 +919,11 @@ def build_output(
             "new_projects": new_projects,
             "fresh_hot": fresh_hot,
         },
-        "categories": categorize(ranked, config),
+        "categories": categorize(
+            hot_today,
+            config,
+            max_per_category=len(hot_today),
+        ),
         "candidates": ranked,
         "instructions": (
             "只基于这些结构化 GitHub 数据生成开源热点趋势；stars_today 来自 GitHub Trending，"
@@ -881,9 +939,9 @@ def build_output(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect local GitHub open-source radar signals")
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--state", type=Path)
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--date", type=date.fromisoformat)
     parser.add_argument("--no-state-write", action="store_true")
     return parser.parse_args()
@@ -891,11 +949,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    paths = resolve_runtime_paths(args)
+    config_path = paths["config"]
+    state_path = paths["state"]
+    output_dir = paths["output_dir"]
     report_date = args.date or datetime.now(tz=ZoneInfo("Asia/Shanghai")).date()
-    config = load_json(args.config, {})
+    config = load_json(config_path, {})
     if not config:
-        raise RuntimeError(f"invalid or missing config: {args.config}")
-    state = load_json(args.state, {"repositories": {}}, strict=True)
+        raise RuntimeError(f"invalid or missing config: {config_path}")
+    state = load_json(state_path, {"repositories": {}}, strict=True)
     token = _github_token()
 
     trending = enrich_trending(fetch_trending(config), config, token)
@@ -906,12 +968,12 @@ def main() -> int:
     ranked = rank_candidates(relevant, config, report_date)
     output_settings = config.get("output", {})
     fresh_hot_days = int(output_settings.get("fresh_hot_days", 7))
-    prior_seen_names = load_recent_shown_names(args.output_dir, report_date, fresh_hot_days)
+    prior_seen_names = load_recent_shown_names(output_dir, report_date, fresh_hot_days)
     new_project_history_days = int(
         output_settings.get("new_project_history_days", output_settings.get("new_project_days", 30))
     )
     prior_new_project_names = load_recent_shown_names(
-        args.output_dir, report_date, new_project_history_days
+        output_dir, report_date, new_project_history_days
     )
     output = build_output(ranked, config, report_date, {
         "trending_count": len(trending),
@@ -928,7 +990,7 @@ def main() -> int:
     }, prior_seen_names=prior_seen_names, prior_new_project_names=prior_new_project_names)
     technical_settings = config.get("technical_analysis", {})
     if technical_settings.get("enabled", False):
-        cache_dir = resolve_data_path(technical_settings["cache_dir"])
+        cache_dir = resolve_data_path(technical_settings["cache_dir"], paths["data_root"])
         technical_projects = enrich_projects_with_technical_evidence(
             output["signals"]["new_projects"], config, token, cache_dir
         )
@@ -941,12 +1003,12 @@ def main() -> int:
     if not output["quality"]["ok"]:
         raise RuntimeError(f"candidate quality check failed: {output['quality']['errors']}")
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = args.output_dir / f"local-open-source-radar-{report_date.isoformat()}.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"local-open-source-radar-{report_date.isoformat()}.json"
     save_json_atomic(output_path, output)
     if not args.no_state_write:
         retention_days = int(config.get("state", {}).get("retention_days", 90))
-        save_json_atomic(args.state, prune_state(next_state, report_date, retention_days))
+        save_json_atomic(state_path, prune_state(next_state, report_date, retention_days))
     print(json.dumps({
         "ok": True,
         "output_path": str(output_path),

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "collector.py"
 spec = importlib.util.spec_from_file_location("local_open_source_radar", MODULE_PATH)
@@ -207,6 +208,48 @@ class PathResolutionTests(unittest.TestCase):
             Path("/var/cache/local-radar"),
             radar.resolve_data_path("/var/cache/local-radar", data_root),
         )
+
+
+    def test_categories_are_built_from_hot_today_without_category_limit_truncation(self):
+        ranked = [
+            {
+                "full_name": f"Acme/agent-{index}",
+                "url": f"https://github.com/Acme/agent-{index}",
+                "description": "agent workflow",
+                "topics": [],
+                "stars_total": 10,
+                "stars_today": 10 - index,
+                "stars_delta": 0,
+                "sources": ["github-trending"],
+            }
+            for index in range(3)
+        ]
+        config = {
+            "categories": [{"label": "Agents", "keywords": ["agent"]}],
+            "output": {"top_hot": 3, "top_new": 0, "top_fresh_hot": 0, "category_limit": 1},
+        }
+
+        output = radar.build_output(ranked, config, date(2026, 8, 12), {})
+
+        self.assertEqual(
+            ["Acme/agent-0", "Acme/agent-1", "Acme/agent-2"],
+            [item["full_name"] for item in output["categories"]["Agents"]],
+        )
+
+    def test_runtime_paths_derive_relative_cache_root_from_explicit_config(self):
+        data_root = Path("/tmp/isolated-runtime/data/local-open-source-radar")
+        args = SimpleNamespace(
+            config=data_root / "config" / "config.json",
+            state=data_root / "state" / "state.json",
+            output_dir=data_root / "output",
+        )
+
+        paths = radar.resolve_runtime_paths(args)
+
+        self.assertEqual(data_root / "cache", radar.resolve_data_path("cache", paths["data_root"]))
+        self.assertEqual(data_root / "config" / "config.json", paths["config"])
+        self.assertEqual(data_root / "state" / "state.json", paths["state"])
+        self.assertEqual(data_root / "output", paths["output_dir"])
 
 
 class RelevanceTests(unittest.TestCase):

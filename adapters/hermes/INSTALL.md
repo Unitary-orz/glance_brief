@@ -25,20 +25,19 @@ $HERMES_HOME/data/glance-brief/
 
 The entry point does not discover or collect the independent local radar. Set
 `LOCAL_OPEN_SOURCE_RADAR_READER` in the runtime environment to the producer's
-reader and, when required by that reader, set
-`LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR` to its rendered-report output directory.
-Do not put a local radar Job ID in the reusable business module.
+reader. The reader must consume the producer's structured snapshot and derive
+its category mapping from the snapshot; do not connect it to rendered report
+Markdown. Do not put a local radar Job ID in the reusable business module.
 
 ## Environment
 
 The generic entry point sets only repository-relative defaults for the
 installed compatibility/configuration helpers. The independent local radar
-reader and its rendered-report directory are producer-owned runtime inputs
-and must be supplied by the selected runtime adapter:
+reader is a producer-owned runtime input and must be supplied by the selected
+runtime adapter:
 
 ```text
 LOCAL_OPEN_SOURCE_RADAR_READER -> configured reader supplied by the independent local radar
-LOCAL_OPEN_SOURCE_RADAR_REPORT_DIR -> reader-specific rendered-report directory, if the reader needs it
 AGENTS_RADAR_COLLECTOR            -> legacy lib/agents-report/agents-radar-daily.py
 AGENTS_RADAR_OUTPUT_DIR           -> legacy collector output directory
 AGENTS_RADAR_QUALITY_CONFIG       -> $HERMES_HOME/data/glance-brief/config/agents_radar_quality.json
