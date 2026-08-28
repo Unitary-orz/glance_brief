@@ -443,6 +443,9 @@ class OutputContractTests(unittest.TestCase):
         self.assertIn("每个分类只输出一行项目内容", prompt)
         self.assertNotIn("每个分类只输出两行", prompt)
         self.assertNotIn("- 其他项目：", prompt)
+        self.assertIn("若 `fresh_hot` 非空，先输出一次 `**✨新热门开源**` 段落标题", prompt)
+        self.assertIn("不添加 `热门项目：`、`✨ `、“新入榜：”或“✨新热门开源：”前缀", prompt)
+        self.assertIn("展示时仅在标题前加连续圆圈数字", prompt)
 
     def test_agents_prompt_uses_available_sources_without_padding(self):
         prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
