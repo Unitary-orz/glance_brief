@@ -1,40 +1,30 @@
 {
   "fixture": true,
-  "fixture_note": "Offline example data only; these are not current news items.",
+  "fixture_note": "Offline V2 contract data; not current news.",
   "items": [
     {
-      "title": "[Fixture] 海外代表就海上科研协作发布联合说明",
-      "summary": "示例国际候选：联合说明提出继续开展海上科研协作，内容仅用于离线测试。",
+      "title": "International representatives issue joint statement on maritime research cooperation",
+      "summary": "International cooperation representatives issued a joint statement on continued maritime research work.",
+      "category": "international",
+      "published_at": "2026-08-30T01:00:00Z",
+      "source": {
+        "name": "Example Wire"
+      },
       "links": {
         "canonical": "https://example.com/fixtures/international/maritime-cooperation"
-      },
-      "source": {
-        "name": "Example World Desk"
-      },
-      "publishedAt": "2026-01-15T08:00:00Z",
-      "category": "international",
-      "tags": ["diplomacy", "science"],
-      "region": "global"
+      }
     },
     {
-      "headline": "[Fixture] 示例制造商公布季度供应链计划",
-      "description": "示例商业候选：一家虚构制造商公布季度供应链计划，数据不代表现实企业或现实事件。",
-      "url": "https://example.com/fixtures/business/supply-plan",
-      "publisher": "Example Market Desk",
-      "date": "2026-01-15",
+      "title": "示例企业发布季度经营说明",
+      "summary": "企业发布季度经营说明，内容仅用于离线合同测试。",
       "category": "business",
-      "tags": ["industry", "supply-chain"],
-      "market": "manufacturing"
-    },
-    {
-      "title": "[Fixture] 示例软件团队发布工具链维护说明",
-      "content": "示例 AI 相关候选：软件团队发布一份工具链维护说明，用于验证跨板块候选与语义提示。",
-      "link": "https://example.com/fixtures/ai/tooling-note",
-      "source": "Example Tech Desk",
-      "published_at": "2026-01-15T10:30:00Z",
-      "category": "ai",
-      "tags": ["tooling", "agents"],
-      "region": "global"
+      "published_at": "2026-08-30T02:00:00Z",
+      "source": {
+        "name": "Example Business"
+      },
+      "links": {
+        "canonical": "https://example.com/fixtures/business/quarterly-update"
+      }
     }
   ]
 }

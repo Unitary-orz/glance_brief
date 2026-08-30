@@ -1,115 +1,92 @@
 # Output Contracts
 
+输出格式是公开接口。模型只返回语义 JSON；下列 Markdown 由程序确定性生成。
+
 ## agents-report
 
-当前可见结构保持稳定：
-
 ```markdown
-📡 **agents-radar 生态报告 | [日期]**
+📡 **agents-radar 生态报告 | YYYY-MM-DD**
 
 **🤖 AI 生态动态**
-- ① ...（来源：[短标签](真实 URL)）
-- ② ...（来源：[短标签](真实 URL)）
-- ③ ...（来源：[短标签](真实 URL)）
+- ① 一句忠实摘要。（来源：[来源](精确 URL) · [AIHOT](精确条目 URL)）
 
----
-
-[脚本渲染内容，原样插入；`codexradar.markdown` 自身包含 `**🧠 CodexRadar 智力效率**` 标题，不要重复添加]
-
----
+[逐字插入 producer-owned `codexradar.markdown`；该 block 自带标题]
 
 **🔥 开源热点趋势**
-- ① 总体趋势
-- ② 总体趋势
+- ① 不含具体项目、模型或指标的总体趋势
+- ② 不含具体项目、模型或指标的总体趋势
 
-分类标题
-- 热门项目：...
-- 其他项目：...
+**✨新热门开源**
+- [owner/repo](精确 GitHub URL)「producer 描述」(+X★/日)
+
+① producer 分类标题
+- 热门项目：✨ [owner/repo](精确 GitHub URL)「producer 描述」(+X★/日)
 ```
 
 约束：
 
-- AI 动态正文每条不超过 140 字。
-- 每条 AI 动态保留 1–3 个真实相关来源；只有一个来源时不凑数。
-- 来源文本 2～8 个字，URL 使用预取数据中的真实链接。
-- CodexRadar 不在 Prompt 中重算。
-- 开源趋势前两行不得写具体项目清单。
-- 项目分类标题不是列表项。
-- 小分类按 Prompt 规则合并为 `其他`，避免生成大量单项目分类。
-- 每个项目分类固定两行项目内容。
-- 每个项目保留真实 GitHub Markdown 链接；`其他项目` 不超过质量配置中的上限。
-- 最终正文必须直接以报告标题开头，不得包含执行元说明。
+- AI 动态最多三条，每条只绑定一个候选；来源从候选 provenance 回填。
+- CodexRadar Markdown 只验证后原样插入，不解析、不重排、不重算。
+- 开源总体趋势必须恰好两条，不得出现项目名、组织名、模型名、URL、Star 或其他数值。
+- `fresh_hot` 必须是 `hot_today` 的唯一子集；非空时只生成一次 `**✨新热门开源**`。
+- `local_report_categories` 必须唯一、完整覆盖 `hot_today`；分类标题逐字保留、顺序不变，每类只展示映射的第一项。
+- 项目名、URL、描述、`stars_today` 和 `is_fresh_hot` 全部来自 producer，不猜测或拼接。
+- `new_projects` 属于独立雷达，本报告不展示。
+- 不生成 `其他项目`，不使用 Markdown 分隔线。
 
 ## noon-news
-
-当前可见 Markdown 结构保持稳定；V2 内部先通过独立语义协议，再由程序回填元数据并渲染：
 
 ```markdown
 📰 今日热点简报
 
 ### 今日要点
-1. 主题词：一句话事实。
+1. 主题词：一句候选支持的事实
 
 ### 分类详情
+
 **① 国际要闻**
-- **English Title**（中文对照翻译；仅英文原始标题使用）
-  一句话事实描述。
-  > 来源：[NS•AlJazeera](原文链接)•[BBC](原文链接)
+- **English original headline**（约 12–28 字中文对照）
+  一句候选支持的事实。
+  > 来源：[NS•Publisher](精确原文 URL)
+
+**② 宏观与商业**
+...
+
+**③ AI 主线**
+- **原始非英文标题**
+  一句候选支持的事实。
+  > 来源：[AIHOT](精确条目 URL)•[Publisher](精确原文 URL)
 ```
-
-V2 语义对象使用 `glance_brief.noon-news.v2`：
-
-```json
-{
-  "semantic_protocol": "glance_brief.noon-news.v2",
-  "report": "noon-news",
-  "report_date": "YYYY-MM-DD",
-  "generated_at": "ISO-8601 timestamp",
-  "top_points": [
-    {"item_ids": ["i..."], "topic": "中文主题", "fact": "核心事实"}
-  ],
-  "sections": {
-    "international": [
-      {
-        "item_id": "i...",
-        "candidate_ids": ["c..."],
-        "headline": "候选原始标题",
-        "headline_zh": "英文标题的中文对照翻译",
-        "summary": "候选支持的事实摘要",
-        "sources": [{"source_id": "...", "label": "...", "url": "https://..."}],
-        "published_at": "候选发布时间或 null"
-      }
-    ],
-    "domestic": [],
-    "business": [],
-    "ai": []
-  }
-}
-```
-
-模型输入输出协议见 `v2/prompts/noon-news.md`。模型只返回单个候选 ID、摘要、可选中文对照翻译，以及直接引用候选 ID 的全局要点；不再维护 `item_ref`，也不输出影响说明和证据等级。每条详情只允许一个候选，稳定 `item_id`、标题、来源、URL 和发布时间由程序恢复。精简协议只做必要结构校验：JSON、四个板块、候选 ID 和基本引用关系；要点超出 5 条时取前 5 条，重复或未绑定的要点忽略，不因数字等价写法、摘要长度或额外无害字段阻断整份报告。
 
 约束：
 
-- `今日要点` 严格 4–5 条。
-- 新闻详情固定分为 `international`、`domestic`、`business`、`ai` 四个板块；内容不足可以为空，不用无关内容凑数。
-- 主题词 2–8 个中文/混合字符；事实句保持简短；不带来源标签。
-- 每条分类详情固定为连续三行：第 1 行只写标题（英文标题可带中文对照翻译），第 2 行只写一句事实描述，第 3 行只写来源引用；标题行不得追加冒号和描述，禁止将标题与描述合并为一行。
-- 来源单独一行，用引用块（`> 来源：`）呈现，不并入事实描述行；正文不显示 URL 明文。
-- 来源链接文字内冒号一律替换为 `•`（内容保留，如 `X：Boris Cherny` → `X•Boris Cherny`）；`公众号` 统一替换为 `WX`。
-- 格式 `> 来源：[渠道•原文媒体](链接)`；所有来源统一用 `•` 连接；同渠道去重（渠道只写一次，媒体 `•` 连接）。
-- 每条新闻最多 2 个渠道，超过时只保留前 2 个渠道并在行末加 `+N`（N 为省略的渠道数）。
-- 渠道简写 `NS`/`NA`/`AIHOT`/`V2EX` 控制在 2～8 字；AI HOT 原文媒体取 `source.name`，其它来源取条目 `source` 字段；AI HOT 原文链接取 `links.original`（缺失时 `links.aihot`），其它来源使用原始 `link` / `url`。
-- 标题按脚本原始条目的 `title` 字段保留原文；只有英文原始标题在后面加中文对照翻译括号，中文、日文等非英文标题直接写原题，不加翻译括号。
-- 只增加链接时，不改变标题、章节、换行和来源位置。
-- 事实句只写原文可核对的内容；允许来源明确给出的预测或预警，但必须保留预测属性，禁止模型自行推演。
-- 精简协议的校验器只拦截无法渲染或无法恢复引用的结构问题；旧模型协议仍保留更严格的离线 fixture 校验。
+- 详情固定三段：`international`、`macro_business`、`ai`；每条详情固定三行。
+- 每条详情只绑定一个候选；模型不得跨事件或跨候选合并。
+- 原题由程序逐字回填。只有英文原题可附约 12–28 字中文对照；中文、日文等非英文标题不翻译。
+- `top_points` 只引用已选详情，最多五条；重复或未绑定项属于 hard failure，不生成报告。
+- AIHOT 条目页 URL 与原文 URL 是两个 provenance link，分别保留；renderer 使用 producer 提供的精确 URL。
+- 来源标签中的层级冒号规范为空格；同渠道 URL 去重，渠道内及渠道间统一用 `•` 连接，每条最多两个渠道，更多显示 `+N`。
+- 模型 payload 不含 URL、来源 metadata、日期、项目指标或 Markdown。
+- 不使用 Markdown 分隔线。
+
+## 生产运行策略
+
+- 来源级 `required`：必选 producer 失败时在模型调用前终止，绝不生成部分报告。
+- 报告级 `minimum_candidates`：固定板块候选低于下限时在模型调用前终止。
+- `command_json` 默认不继承全部环境变量，只能获得基础变量与显式 `env_allowlist`。
+- 每次运行写入 `manifest.json`：报告、状态、生成时间、全部输入/输出 artifact 与 config 的 SHA-256、模型参数。
+- 模型 `summary` 超过 300 字符属于 hard failure。
+
+## Resolved schema 所有权
+
+两个 resolved 对象均固定 `schema_version: 2`。Noon 使用受信任的 `report_date` 与 `generated_at`，Agents 使用受信任的 `date`；两者都包含固定 sections。模型字段只能进入摘要、翻译、主题和趋势位置；候选 ID 解析后，所有不可变事实从 candidate registry 回填。
 
 ## 变更规则
 
-输出格式属于公开接口。任何可见排版变更都必须：
+任何可见格式变更都必须同时：
 
-1. 更新对应 Prompt 版本。
-2. 更新本文档。
-3. 更新 fixture / snapshot 测试。
-4. 先给出渲染预览，再修改运行时任务。
+1. 更新 Prompt 所有权边界；
+2. 更新本文档；
+3. 更新 fixture/contract tests；
+4. 生成本地 preview；
+5. 获得明确授权后才同步 runtime 或 Cron。

@@ -1,33 +1,33 @@
 {
   "fixture": true,
-  "fixture_note": "Offline example data only; these are not current AI reports.",
+  "fixture_note": "Offline V2 contract data; not current AI news.",
   "payload": {
     "entries": [
       {
-        "headline": "[Fixture] 智能体编排工具增加可审计流程示例",
-        "abstract": "示例 AI 候选：一个虚构工具链演示如何记录智能体步骤，便于人工复核和离线摘要测试。",
-        "permalink": "https://example.com/fixtures/ai/agent-audit-workflow",
+        "headline": "示例智能体工具增加可审计流程能力",
+        "abstract": "智能体工具增加可审计流程能力，便于人工复核协作步骤。",
+        "category": "ai",
+        "published": "2026-08-30T03:00:00Z",
         "publisher": {
-          "name": "Example AI Digest"
+          "name": "Example AI Lab"
         },
-        "published": "2026-01-15T09:15:00Z",
-        "category": "industry",
-        "tags": ["agents", "orchestration", "audit"],
-        "evidence": "fixture-summary",
-        "confidence": "example"
+        "links": {
+          "aihot": "https://example.com/fixtures/ai/item/agent-audit-workflow",
+          "original": "https://example.com/fixtures/ai/original/agent-audit-workflow"
+        }
       },
       {
-        "title": "[Fixture] 小型模型工具调用研究摘要",
-        "summary": "示例 AI 研究候选：一份虚构研究摘要讨论小型模型在工具调用任务中的评测方法。",
-        "links": {
-          "primary": "https://example.com/fixtures/ai/small-model-tool-use"
+        "headline": "示例研究团队发布工具调用评测说明",
+        "abstract": "研究团队发布工具调用评测说明，用于验证多候选边界。",
+        "category": "ai",
+        "published": "2026-08-30T03:30:00Z",
+        "publisher": {
+          "name": "Example Research"
         },
-        "publisher": "Example Research Desk",
-        "date": "2026-01-15",
-        "category": "paper",
-        "tags": ["models", "tool-use", "evaluation"],
-        "evidence": ["fixture-paper"],
-        "confidence": "example"
+        "links": {
+          "aihot": "https://example.com/fixtures/ai/item/tool-use-evaluation",
+          "original": "https://example.com/fixtures/ai/original/tool-use-evaluation"
+        }
       }
     ]
   }

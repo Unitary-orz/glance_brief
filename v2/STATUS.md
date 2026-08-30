@@ -1,59 +1,55 @@
-# brief V2 状态与边界
+# Brief V2 状态与边界
 
-## 定位
+## 当前状态
 
-V2 是与现有 V1 并行的本地实现，用于验证更稳定的语义协议、事实校验和 Markdown 渲染。
+V2 当前用于**独立、非投递验证**：代码、fixture、只读 live producer 快照和本地 preview 均位于独立 worktree。它不修改 `$HOME/.hermes` runtime、Cron、模型配置或飞书目标。
 
-当前阶段：**独立验证，不接入生产**。
-
-- 不修改 Hermes Cron 的调度、模型、投递目标或 prompt 链路；
-- 不覆盖 `$HOME/.hermes/scripts/glance-brief/` 下的现有 runtime；
-- 不把 V2 的实验输出当作生产简报；
-- V1 继续负责当前午间简报的正式运行。
-
-## 目录分工
+## 目录
 
 ```text
 v2/
-├── run_v2.py               # check / probe / run 入口
-├── brief_v2.py             # 配置加载、来源映射、候选池组装
-├── render_report.py         # 结构校验与固定 Markdown 渲染
-├── evaluate_outputs.py     # V1/V2 产物对比
-├── convert_agents_radar.py  # legacy agents-radar 专用转换器
-├── config/                 # 脱敏示例配置
-├── fixtures/               # 离线输入 fixture
-├── prompts/                # 模型语义协议
-└── output/                 # 本地实验产物，禁止作为源码或 runtime 输入
+├── adapters.py              # producer JSON → bounded candidate registry
+├── contracts.py             # immutable schema 与安全校验
+├── resolve.py               # semantic JSON → trusted resolved report
+├── render_report.py         # deterministic Markdown renderer
+├── run_v2.py                # check / probe / run artifact pipeline
+├── config/                  # 脱敏 schema v2 示例配置
+├── fixtures/                # 当前协议离线 source fixtures
+└── prompts/                 # 模型只写语义 JSON 的契约
 ```
 
-`v2/output/` 和 Python 缓存由仓库忽略规则排除；历史实验产物可以留在本地用于复核，不进入提交内容。
+V2 不含 legacy converter、legacy fixtures、legacy tests 或多协议运行分支。
 
-## 当前验证门槛
-
-从仓库根目录执行：
+## 验证门槛
 
 ```bash
 python3 v2/run_v2.py check --config v2/config/brief.example.json
-python3 -m unittest discover -s tests -p 'test_v2*.py'
-python3 -m unittest discover -s tests -p 'test_*.py'
-python3 -m py_compile v2/*.py
+python3 -B -m unittest tests.test_v2_contracts tests.test_v2_pipeline -v
+python3 -B -m unittest discover -s tests -p 'test_*.py'
+python3 -m py_compile v2/*.py tests/test_v2_contracts.py tests/test_v2_pipeline.py
+git diff --check
 ```
 
-V2 的正式 Markdown 只能由程序从已通过结构、候选引用和事实数字校验的语义对象渲染；模型原始响应校验失败时不得静默生成报告。
+当前独立验收已覆盖：
 
-## 已知限制
+1. 脱敏 fixture 两报告端到端 preview；
+2. 同日只读 producer 快照 preview；
+3. 正式模型的非投递 live run；
+4. URL provenance、Codex block、分类覆盖、项目事实和可见样式机器复核；
+5. 与当日 V1 正式产物做结构对比，但不复制 V1 中无法核验的链接或偶然排版错误。
 
-- 模型仍可能生成候选未支持的数字或事实；当前校验器应拒绝该响应，而不是修正文案后继续发布。
-- 单次基准通过不代表模型输出稳定，需要在冻结输入和真实输入上分别复核。
-- 生产切换前还需要独立的 runtime adapter、失败回退策略和至少一轮不投递的端到端演练。
+## Fail-closed
 
-## 允许进入生产的条件
+以下问题不生成 `report.md`：非法 JSON、未知或复用 candidate ID、候选外数字、URL 或 Markdown 注入、不合格 AIHOT provenance、Codex block 缺失、local-radar quality 非 `ok`、fresh 不是 hot 子集、分类未唯一完整覆盖 hot、模型输出项目名/Star/Codex 内容。
 
-只有同时满足以下条件，才讨论接入 Hermes runtime：
+失败目录保留原始响应及 `failure.json`，不得把失败结果当作空报告投递。
 
-1. V2 代码、测试、配置和文档形成明确的仓库变更；
-2. 真实输入上的错误事实均能 fail closed；
-3. 模型失败、空响应、非法 JSON 和来源失败均有可观测结果；
-4. V1 与 V2 完成不投递的对照运行；
-5. 明确回退到 V1 的开关和验证过的 runtime adapter；
-6. 用户明确批准接入 Cron。
+## 生产接入条件
+
+只有同时满足以下条件才讨论接入 runtime：
+
+1. fixture、快照、live model 与完整仓库测试全部通过；
+2. 正式 producer adapter 的路径和原子快照读取方式经过验证；
+3. 失败回退、超时、费用和投递 adapter 有明确设计；
+4. installer/runtime 同步形成单独、可审查变更；
+5. 用户明确批准修改 Cron 与正式投递。

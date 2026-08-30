@@ -1,103 +1,166 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sources": {
     "news_wire": {
       "driver": "json_file",
       "path": "../fixtures/news.json",
       "items_path": "items",
-      "label": "News",
+      "channel_id": "news-summary",
+      "channel_label": "NS",
+      "required": true,
       "map": {
-        "title": ["title", "headline"],
-        "text": ["summary", "description", "content"],
-        "url": ["links.canonical", "url", "link"],
-        "publisher": ["source.name", "publisher", "source"],
-        "published_at": ["published_at", "publishedAt", "date"],
+        "title": "title",
+        "text": "summary",
+        "published_at": "published_at",
         "extra": {
           "category": "category"
-        }
+        },
+        "links": [
+          {
+            "role": "article",
+            "label_path": "source.name",
+            "path": "links.canonical"
+          }
+        ]
       }
     },
     "ai_digest": {
       "driver": "json_file",
       "path": "../fixtures/ai.json",
       "items_path": "payload.entries",
-      "label": "AIHOT",
+      "channel_id": "aihot",
+      "channel_label": "AIHOT",
       "map": {
-        "title": ["headline", "title"],
-        "text": ["abstract", "summary", "description"],
-        "url": ["permalink", "links.primary", "url"],
-        "publisher": ["publisher.name", "publisher", "source"],
-        "published_at": ["published", "published_at", "date"],
+        "title": "headline",
+        "text": "abstract",
+        "published_at": "published",
         "extra": {
           "category": "category"
-        }
+        },
+        "links": [
+          {
+            "role": "item",
+            "label": "AIHOT",
+            "path": "links.aihot"
+          },
+          {
+            "role": "original",
+            "label_path": "publisher.name",
+            "path": "links.original"
+          }
+        ]
       }
     },
     "open_source_radar": {
       "driver": "json_file",
       "path": "../fixtures/open-source.json",
       "items_path": "signals.hot_today",
-      "label": "Radar",
+      "channel_id": "github",
+      "channel_label": "GitHub",
       "map": {
-        "title": ["full_name", "name", "title"],
-        "text": ["description", "summary"],
-        "url": ["html_url", "url"],
-        "publisher": ["owner.login", "publisher", "source"],
-        "published_at": ["observed_at", "published_at", "date"],
+        "title": "full_name",
+        "text": "description",
         "extra": {
-          "kind": "kind",
-          "category": ["category", "language"],
-          "role": "role",
-          "stars_today": "stars_today"
-        }
+          "full_name": "full_name",
+          "description": "description",
+          "stars_today": "stars_today",
+          "is_fresh_hot": "is_fresh_hot",
+          "language": "language",
+          "topics": "topics"
+        },
+        "links": [
+          {
+            "role": "repository",
+            "label_path": "full_name",
+            "path": "url"
+          }
+        ]
+      },
+      "snapshot": {
+        "fresh_hot": "signals.fresh_hot",
+        "local_report_categories": "local_report_categories",
+        "quality": "quality",
+        "new_projects": "signals.new_projects"
       }
     },
     "codex_radar": {
       "driver": "json_file",
       "path": "../fixtures/codexradar.json",
-      "items_path": "snapshot.points",
-      "label": "CodexRadar",
-      "map": {
-        "title": ["model", "name"],
-        "extra": {
-          "ranking": "rankings",
-          "effort": "effort",
-          "iq": "iq",
-          "average_minutes": "average_minutes",
-          "average_price_usd": "average_price_usd"
-        }
+      "items_path": "items",
+      "channel_id": "codexradar",
+      "channel_label": "CodexRadar",
+      "map": {},
+      "snapshot": {
+        "markdown": "markdown"
       }
     }
   },
   "reports": {
     "noon-news": {
+      "minimum_candidates": {
+        "international": 1,
+        "macro_business": 1,
+        "ai": 1
+      },
       "sections": {
         "international": [
-          {"source": "news_wire", "match": {"category": ["international"]}, "take": 8}
+          {
+            "source": "news_wire",
+            "match": {
+              "category": [
+                "international"
+              ]
+            },
+            "take": 8
+          }
         ],
-        "domestic": [
-          {"source": "news_wire", "match": {"category": ["domestic"]}, "take": 8}
-        ],
-        "business": [
-          {"source": "news_wire", "match": {"category": ["business"]}, "take": 8}
+        "macro_business": [
+          {
+            "source": "news_wire",
+            "match": {
+              "category": [
+                "business"
+              ]
+            },
+            "take": 8
+          }
         ],
         "ai": [
-          {"source": "ai_digest", "take": 8},
-          {"source": "news_wire", "match": {"category": ["ai"]}, "take": 4}
+          {
+            "source": "ai_digest",
+            "take": 8
+          }
         ]
       }
     },
     "agents-report": {
+      "minimum_candidates": {
+        "ai_ecosystem": 1,
+        "codexradar": 0,
+        "open_source": 1
+      },
       "sections": {
         "ai_ecosystem": [
-          {"source": "ai_digest", "take": 8}
+          {
+            "source": "ai_digest",
+            "take": 8
+          }
         ],
-        "model_efficiency": [
-          {"source": "codex_radar", "take": 12}
-        ],
+        "codexradar": [],
         "open_source": [
-          {"source": "open_source_radar", "take": 25}
+          {
+            "source": "open_source_radar",
+            "take": 10
+          }
         ]
+      },
+      "metadata": {
+        "codexradar": {
+          "source": "codex_radar"
+        },
+        "open_source": {
+          "source": "open_source_radar"
+        }
       }
     }
   }
