@@ -73,8 +73,10 @@
 
 - 来源级 `required`：必选 producer 失败时在模型调用前终止，绝不生成部分报告。
 - 报告级 `minimum_candidates`：固定板块候选低于下限时在模型调用前终止。
+- Noon `selection_limits`：每个板块最终选择条数必须落在配置的 `min`/`max` 范围内；limits 会进入 lean payload，但由 resolver 最终 hard gate。
 - `command_json` 默认不继承全部环境变量，只能获得基础变量与显式 `env_allowlist`。
 - 每次运行写入 `manifest.json`：报告、状态、生成时间、全部输入/输出 artifact 与 config 的 SHA-256、模型参数。
+- `replay` 只接受成功且输入哈希一致的快照，在不读取来源、不调用模型的情况下重新 resolve/render；输入输出目录必须不同。
 - 模型 `summary` 超过 300 字符属于 hard failure。
 
 ## Resolved schema 所有权

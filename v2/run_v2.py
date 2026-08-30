@@ -134,8 +134,12 @@ def build_model_payload(report_id: str, assembled: Mapping[str, Any]) -> dict[st
     if assembled.get("schema_version") != contracts.SCHEMA_VERSION or assembled.get("report") != report_id:
         raise contracts.ContractError("assembled report does not match model payload request")
     if report_id == contracts.NOON_REPORT:
+        selection_limits = assembled.get("selection_limits", {})
+        if not isinstance(selection_limits, Mapping):
+            raise contracts.ContractError("assembled.selection_limits must be an object")
         return {
             "report": report_id,
+            "selection_limits": {section: dict(limit) for section, limit in selection_limits.items()},
             "sections": {
                 section: _section_candidates(
                     assembled,
@@ -281,12 +285,14 @@ def run_pipeline(args: argparse.Namespace) -> Path:
 
         model_object = resolve.parse_model_response(raw)
         write_json(output / "model-response.json", model_object)
+        report_date = _report_date(args.date)
+        generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
         resolved, warnings = resolve.resolve_report(
             args.report,
             model_object,
             assembled,
-            _report_date(args.date),
-            generated_at=dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+            report_date,
+            generated_at=generated_at,
         )
         write_json(output / "resolved.json", resolved)
         write_json(output / "warnings.json", warnings)
@@ -301,6 +307,9 @@ def run_pipeline(args: argparse.Namespace) -> Path:
                 "model": args.model,
                 "provider": args.provider,
                 "reasoning": args.reasoning,
+                "mode": "run",
+                "report_date": report_date,
+                "resolved_generated_at": generated_at,
             },
         )
         return output / "report.md"
@@ -313,6 +322,93 @@ def run_pipeline(args: argparse.Namespace) -> Path:
             if path.exists():
                 path.unlink()
         write_manifest(output, report=args.report, status="failed")
+        raise
+
+
+def _verified_snapshot_artifact(input_dir: Path, manifest: Mapping[str, Any], name: str) -> Path:
+    path = input_dir / name
+    key = f"{name.replace('.', '_')}_sha256"
+    expected = manifest.get(key)
+    if not isinstance(expected, str) or len(expected) != 64:
+        raise contracts.ContractError(f"snapshot manifest is missing {key}")
+    if not path.is_file():
+        raise contracts.ContractError(f"snapshot is missing {name}")
+    actual = _sha256(path)
+    if actual != expected:
+        raise contracts.ContractError(f"snapshot hash mismatch for {name}")
+    return path
+
+
+def replay_pipeline(args: argparse.Namespace) -> Path:
+    """Re-resolve and re-render a verified run without sources or a model call."""
+    input_dir = args.input_dir.resolve()
+    output = args.output_dir.resolve()
+    if input_dir == output:
+        raise contracts.ContractError("replay input and output directories must differ")
+    _clear_known_artifacts(output)
+    report_id = "unknown"
+    try:
+        manifest_path = input_dir / "manifest.json"
+        manifest = load_json(manifest_path)
+        if manifest.get("status") != "ok":
+            raise contracts.ContractError("replay requires a successful source manifest")
+        report_value = manifest.get("report")
+        if report_value not in REPORTS:
+            raise contracts.ContractError("snapshot manifest has an unsupported report")
+        report_id = str(report_value)
+        report_date = contracts.date(manifest.get("report_date"), "manifest.report_date")
+        generated_at = contracts.timestamp(manifest.get("resolved_generated_at"), "manifest.resolved_generated_at")
+
+        assembled_path = _verified_snapshot_artifact(input_dir, manifest, "assembled.json")
+        raw_path = _verified_snapshot_artifact(input_dir, manifest, "model-response.raw.txt")
+        assembled = load_json(assembled_path)
+        raw = raw_path.read_text(encoding="utf-8")
+        if assembled.get("report") != report_id:
+            raise contracts.ContractError("snapshot report differs between manifest and assembled artifact")
+
+        write_json(output / "assembled.json", assembled)
+        payload = build_model_payload(report_id, assembled)
+        write_json(output / "model-payload.json", payload)
+        contract_path = HERE / "prompts" / f"{report_id}.md"
+        prompt = build_model_prompt(contract_path.read_text(encoding="utf-8"), payload)
+        write_text(output / "model-prompt.txt", prompt)
+        write_text(output / "model-response.raw.txt", raw)
+        source_manifest_sha256 = _sha256(manifest_path)
+        write_json(
+            output / "usage.json",
+            {"mode": "replay", "source_manifest_sha256": source_manifest_sha256},
+        )
+
+        model_object = resolve.parse_model_response(raw)
+        write_json(output / "model-response.json", model_object)
+        resolved, warnings = resolve.resolve_report(
+            report_id,
+            model_object,
+            assembled,
+            report_date,
+            generated_at=generated_at,
+        )
+        write_json(output / "resolved.json", resolved)
+        write_json(output / "warnings.json", warnings)
+        write_text(output / "report.md", render_report.render_report(resolved))
+        extra: dict[str, Any] = {
+            "mode": "replay",
+            "report_date": report_date,
+            "resolved_generated_at": generated_at,
+            "replay_source_manifest_sha256": source_manifest_sha256,
+        }
+        for key in ("config_sha256", "model", "provider", "reasoning"):
+            if key in manifest:
+                extra[key] = manifest[key]
+        write_manifest(output, report=report_id, status="ok", extra=extra)
+        return output / "report.md"
+    except Exception as exc:
+        write_json(output / "failure.json", {"error_type": type(exc).__name__, "error": str(exc)})
+        for name in ("resolved.json", "warnings.json", "report.md"):
+            path = output / name
+            if path.exists():
+                path.unlink()
+        write_manifest(output, report=report_id, status="failed", extra={"mode": "replay"})
         raise
 
 
@@ -338,12 +434,20 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--reasoning", choices=("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"))
     run.add_argument("--timeout", type=float, default=600.0)
     run.add_argument("--date", help="trusted YYYY-MM-DD report date")
+
+    replay = commands.add_parser("replay", help="re-resolve and render a verified prior run")
+    replay.add_argument("--input-dir", required=True, type=Path)
+    replay.add_argument("--output-dir", required=True, type=Path)
     return root
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.command == "replay":
+            path = replay_pipeline(args)
+            print(path)
+            return 0
         config = load_json(args.config)
         adapters.validate_config(config)
         if args.command == "check":

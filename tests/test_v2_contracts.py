@@ -196,6 +196,11 @@ class AdapterContractTests(unittest.TestCase):
             },
             "reports": {
                 "noon-news": {
+                    "selection_limits": {
+                        "international": {"min": 1, "max": 2},
+                        "macro_business": {"min": 0, "max": 2},
+                        "ai": {"min": 0, "max": 2},
+                    },
                     "sections": {
                         "international": [{"source": "wire", "take": 2}],
                         "macro_business": [{"source": "wire", "match": {"category": ["business"]}}],
@@ -226,6 +231,29 @@ class AdapterContractTests(unittest.TestCase):
         }
         with self.assertRaises(ValueError):
             adapters.validate_config(negative_minimum)
+        bad_selection_limit = {
+            **config,
+            "reports": {
+                "noon-news": {
+                    **config["reports"]["noon-news"],
+                    "selection_limits": {"international": {"min": 2, "max": 1}},
+                }
+            },
+        }
+        with self.assertRaises(ValueError):
+            adapters.validate_config(bad_selection_limit)
+        agents_selection_limit = {
+            "schema_version": 2,
+            "sources": config["sources"],
+            "reports": {
+                "agents-report": {
+                    "selection_limits": {"ai_ecosystem": {"min": 0, "max": 1}},
+                    "sections": {"ai_ecosystem": [], "codexradar": [], "open_source": []},
+                }
+            },
+        }
+        with self.assertRaisesRegex(ValueError, "only supported for noon-news"):
+            adapters.validate_config(agents_selection_limit)
 
 
 class ResolverContractTests(unittest.TestCase):
@@ -278,6 +306,19 @@ class ResolverContractTests(unittest.TestCase):
             },
             "harmless_debug": {"ignored": True},
         }
+
+    def test_noon_selection_limits_are_enforced(self):
+        assembled = self._assembled()
+        assembled["selection_limits"] = {
+            "international": {"min": 1, "max": 1},
+            "macro_business": {"min": 1, "max": 1},
+            "ai": {"min": 1, "max": 1},
+        }
+        model = self._model()
+        model["sections"]["international"] = []
+        model["top_points"] = [point for point in model["top_points"] if point["candidate_id"] != "c1111111111111111"]
+        with self.assertRaisesRegex(ValueError, "selection limit"):
+            resolve.resolve_noon(model, assembled, "2026-08-30")
 
     def test_noon_summary_length_has_hard_ceiling(self):
         model = self._model()
@@ -503,6 +544,9 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("不得换算单位", prompt)
         self.assertIn("引述只使用中文引号", prompt)
         self.assertIn("不得使用半角双引号", prompt)
+        self.assertIn("selection_limits", prompt)
+        self.assertIn("min", prompt)
+        self.assertIn("max", prompt)
 
     def test_agents_prompt_excludes_program_owned_facts_and_requires_two_trends(self):
         prompt = (ROOT / "v2" / "prompts" / "agents-report.md").read_text(encoding="utf-8")

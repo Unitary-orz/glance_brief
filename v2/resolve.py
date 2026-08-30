@@ -120,6 +120,27 @@ def _noon_model_sections(model: Mapping[str, Any]) -> Mapping[str, Any]:
     return sections
 
 
+def _enforce_selection_limit(assembled: Mapping[str, Any], section_id: str, selected_count: int) -> None:
+    limits = assembled.get("selection_limits", {})
+    if not isinstance(limits, Mapping):
+        raise contracts.ContractError("assembled.selection_limits must be an object")
+    limit = limits.get(section_id)
+    if limit is None:
+        return
+    if not isinstance(limit, Mapping):
+        raise contracts.ContractError(f"assembled.selection_limits.{section_id} must be an object")
+    minimum = limit.get("min", 0)
+    maximum = limit.get("max")
+    if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0:
+        raise contracts.ContractError(f"assembled.selection_limits.{section_id}.min is invalid")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < minimum:
+        raise contracts.ContractError(f"assembled.selection_limits.{section_id}.max is invalid")
+    if not minimum <= selected_count <= maximum:
+        raise contracts.ContractError(
+            f"model.sections.{section_id} violates selection limit {minimum}-{maximum}: got {selected_count}"
+        )
+
+
 def resolve_noon(
     model: Mapping[str, Any] | str | bytes,
     assembled: Mapping[str, Any],
@@ -147,6 +168,7 @@ def resolve_noon(
         items = model_sections[section_id]
         if not isinstance(items, list):
             raise contracts.ContractError(f"model.sections.{section_id} must be an array")
+        _enforce_selection_limit(assembled, section_id, len(items))
         for index, value in enumerate(items):
             path = f"model.sections.{section_id}[{index}]"
             cid, candidate = _candidate(registry, assembled_sections, section_id, value, path, used)

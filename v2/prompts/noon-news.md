@@ -13,6 +13,8 @@
 
 每条详情只能选择一个 candidate_id。不得把多个候选、多个事件或多个 ID 合并为一条详情；同一 ID 不能跨板块复用。只允许使用该板块候选数组内逐字一致的 ID。
 
+`Candidate evidence JSON.selection_limits` 给出每个板块允许选择的最少和最多条数；三个板块都必须逐项遵守。
+
 ## 文本要求
 
 - `summary`：一句中文事实，不补充候选中没有的数字、日期、因果、身份或推测。候选中的阿拉伯数字必须逐字复制；不得换算单位、币种、比例或数量级，例如 `65bn` 不得改成 `650亿`。
@@ -41,6 +43,7 @@
 硬约束：
 
 - `sections` 恰好包含 `international`、`macro_business`、`ai`，顺序如上。
+- 每个板块的条目数必须落在 `selection_limits` 对应的 `min` 与 `max` 之间。
 - 每条详情只有 `candidate_id`、`summary` 和可选 `headline_zh`。
 - 每条详情只能选择一个 candidate_id；不得出现复数 ID 字段。
 - `top_points` 中每个 ID 必须已在某条详情中选中，且不得重复。

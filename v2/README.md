@@ -45,6 +45,7 @@ producer JSON
 - 受限字段 `map` 和精确 links provenance；
 - 可选 producer-owned `snapshot`；
 - `reports.<report>.minimum_candidates` 板块候选下限与 `sections` 的来源绑定、精确 `match` 和 `take`；
+- Noon 的 `selection_limits` 配置每个板块最终选择条数上下限，limits 同候选一起进入 lean payload，并由 resolver hard gate；
 - agents metadata 指向 CodexRadar 和本地开源雷达来源。
 
 不支持旧 schema、HTTP driver、strict/lean/legacy 分支、动态插件、样式配置或兼容转换器。参考 [`config/brief.example.json`](config/brief.example.json)。
@@ -102,6 +103,16 @@ python3 v2/run_v2.py run \
 失败时保留已生成的输入、prompt、原始响应和 `failure.json`，并删除旧的 `resolved.json` / `warnings.json` / `report.md`，确保 fail closed。
 
 每次成功或失败运行都会写入 `manifest.json`：包含报告、状态、生成时间和全部输入/输出 artifact 的 SHA-256，以及 config 哈希与模型参数，用于生产审计与回放。
+
+已成功运行的快照可以离线重放，不重新读取来源、不调用模型：
+
+```bash
+python3 -B v2/run_v2.py replay \
+  --input-dir /tmp/glance-v2-noon-live \
+  --output-dir /tmp/glance-v2-noon-replay
+```
+
+Replay 会先核对源 manifest 中 `assembled.json` 与 `model-response.raw.txt` 的 SHA-256，再用当前 resolver 和 renderer 重新生成 artifacts。输入、输出目录必须不同；哈希不一致时 fail closed。
 
 ## 验证
 

@@ -102,6 +102,11 @@
         "macro_business": 1,
         "ai": 1
       },
+      "selection_limits": {
+        "international": {"min": 1, "max": 6},
+        "macro_business": {"min": 1, "max": 6},
+        "ai": {"min": 1, "max": 6}
+      },
       "sections": {
         "international": [
           {

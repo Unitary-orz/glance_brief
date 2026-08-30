@@ -40,6 +40,11 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             },
             "reports": {
                 "noon-news": {
+                    "selection_limits": {
+                        "international": {"min": 1, "max": 2},
+                        "macro_business": {"min": 1, "max": 2},
+                        "ai": {"min": 0, "max": 2},
+                    },
                     "sections": {
                         "international": [{"source": "wire", "match": {"category": ["international"]}}],
                         "macro_business": [{"source": "wire", "match": {"category": ["business"]}}],
@@ -120,6 +125,7 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertEqual(len(assembled["sections"]["international"]), 1)
             self.assertEqual(len(assembled["sections"]["macro_business"]), 1)
             payload = run_v2.build_model_payload("noon-news", assembled)
+            self.assertEqual(payload["selection_limits"]["international"], {"min": 1, "max": 2})
             payload_text = json.dumps(payload, ensure_ascii=False)
             self.assertIn("candidate_id", payload_text)
             self.assertIn("International title", payload_text)
@@ -209,8 +215,8 @@ class OfflinePipelineTests(unittest.TestCase):
             ],
             "sections": {
                 "international": [{"candidate_id": ids["international"], "summary": "国际合作发布联合说明。"}],
-                "macro_business": [],
-                "ai": [],
+                "macro_business": [{"candidate_id": ids["macro_business"], "summary": "企业发布季度经营说明。"}],
+                "ai": [{"candidate_id": ids["ai"], "summary": "智能体工具增加审计能力。"}],
             },
         }
         with tempfile.TemporaryDirectory() as temp:
@@ -231,6 +237,64 @@ class OfflinePipelineTests(unittest.TestCase):
 
     def _sha256(self, path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def test_replay_rebuilds_identical_report_without_sources_or_model(self):
+        assembled = self._assembled("noon-news")
+        ids = {key: values[0] for key, values in assembled["sections"].items()}
+        model = {
+            "top_points": [{"candidate_id": ids["international"], "topic": "国际", "fact": "国际合作发布联合说明"}],
+            "sections": {
+                "international": [{"candidate_id": ids["international"], "summary": "国际合作发布联合说明。"}],
+                "macro_business": [{"candidate_id": ids["macro_business"], "summary": "企业发布季度经营说明。"}],
+                "ai": [{"candidate_id": ids["ai"], "summary": "智能体工具增加审计能力。"}],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original = root / "original"
+            replayed = root / "replayed"
+            completed = self._run("noon-news", model, original)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            replay = subprocess.run(
+                [sys.executable, str(self.CLI), "replay", "--input-dir", str(original), "--output-dir", str(replayed)],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(replay.returncode, 0, replay.stderr)
+            self.assertEqual((replayed / "report.md").read_bytes(), (original / "report.md").read_bytes())
+            self.assertEqual((replayed / "resolved.json").read_bytes(), (original / "resolved.json").read_bytes())
+            manifest = json.loads((replayed / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["mode"], "replay")
+            self.assertEqual(manifest["replay_source_manifest_sha256"], self._sha256(original / "manifest.json"))
+
+    def test_replay_rejects_tampered_snapshot_before_resolution(self):
+        assembled = self._assembled("noon-news")
+        ids = {key: values[0] for key, values in assembled["sections"].items()}
+        model = {
+            "top_points": [],
+            "sections": {
+                "international": [{"candidate_id": ids["international"], "summary": "国际合作发布联合说明。"}],
+                "macro_business": [{"candidate_id": ids["macro_business"], "summary": "企业发布季度经营说明。"}],
+                "ai": [{"candidate_id": ids["ai"], "summary": "智能体工具增加审计能力。"}],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original = root / "original"
+            replayed = root / "replayed"
+            completed = self._run("noon-news", model, original)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            with (original / "assembled.json").open("a", encoding="utf-8") as handle:
+                handle.write(" ")
+            replay = subprocess.run(
+                [sys.executable, str(self.CLI), "replay", "--input-dir", str(original), "--output-dir", str(replayed)],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertNotEqual(replay.returncode, 0)
+            failure = json.loads((replayed / "failure.json").read_text(encoding="utf-8"))
+            self.assertIn("hash mismatch", failure["error"])
+            self.assertFalse((replayed / "report.md").exists())
+            manifest = json.loads((replayed / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "failed")
 
     def test_model_output_size_is_hard_limited(self):
         with tempfile.TemporaryDirectory() as temp:

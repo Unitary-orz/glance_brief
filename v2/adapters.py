@@ -298,7 +298,7 @@ def validate_config(config: Any) -> None:
     for report_id, report in reports.items():
         if not isinstance(report, Mapping):
             raise contracts.ContractError(f"reports.{report_id} must be an object")
-        if set(report) - {"sections", "metadata", "minimum_candidates"}:
+        if set(report) - {"sections", "metadata", "minimum_candidates", "selection_limits"}:
             raise contracts.ContractError(f"reports.{report_id} has unknown fields")
         sections = report.get("sections")
         if not isinstance(sections, Mapping) or set(sections) != set(REPORT_SECTIONS[report_id]):
@@ -316,6 +316,29 @@ def validate_config(config: Any) -> None:
             if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0:
                 raise contracts.ContractError(
                     f"reports.{report_id}.minimum_candidates.{section_id} must be a non-negative integer"
+                )
+        selection_limits = report.get("selection_limits", {})
+        if selection_limits and report_id != contracts.NOON_REPORT:
+            raise contracts.ContractError("selection_limits is only supported for noon-news")
+        if not isinstance(selection_limits, Mapping) or set(selection_limits) - set(REPORT_SECTIONS[report_id]):
+            raise contracts.ContractError(f"reports.{report_id}.selection_limits must use current section IDs")
+        for section_id, limit in selection_limits.items():
+            if not isinstance(limit, Mapping) or set(limit) != {"min", "max"}:
+                raise contracts.ContractError(
+                    f"reports.{report_id}.selection_limits.{section_id} must contain min and max"
+                )
+            minimum = limit["min"]
+            maximum = limit["max"]
+            if (
+                isinstance(minimum, bool)
+                or not isinstance(minimum, int)
+                or isinstance(maximum, bool)
+                or not isinstance(maximum, int)
+                or minimum < 0
+                or maximum < minimum
+            ):
+                raise contracts.ContractError(
+                    f"reports.{report_id}.selection_limits.{section_id} must satisfy 0 <= min <= max"
                 )
         metadata = report.get("metadata", {})
         if not isinstance(metadata, Mapping) or set(metadata) - {"codexradar", "open_source"}:
@@ -458,6 +481,8 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
         "sections": sections,
         "metadata": metadata,
     }
+    if report.get("selection_limits"):
+        result["selection_limits"] = copy.deepcopy(report["selection_limits"])
     if errors:
         result["source_errors"] = errors
     return result
@@ -485,6 +510,14 @@ def validate_assembly_health(config: Mapping[str, Any], report_id: str, assemble
         if len(candidates) < minimum:
             raise contracts.ContractError(
                 f"section {section_id} needs at least {minimum} candidates; got {len(candidates)}"
+            )
+    for section_id, limit in config["reports"][report_id].get("selection_limits", {}).items():
+        candidates = sections.get(section_id)
+        minimum = limit["min"]
+        if not isinstance(candidates, list) or len(candidates) < minimum:
+            count = len(candidates) if isinstance(candidates, list) else 0
+            raise contracts.ContractError(
+                f"section {section_id} cannot satisfy selection minimum {minimum}; got {count} candidates"
             )
 
 
