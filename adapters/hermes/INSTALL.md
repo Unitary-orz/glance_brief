@@ -1,80 +1,121 @@
-# Hermes adapter
+# Hermes runtime adapter
 
-This directory describes how `glance_brief` connects to Hermes Cron. The
-example is a template, not a direct import file. The supported installation
-path is the agent contract in the repository root `INSTALL.md`, which runs
-`install/install.py` and creates the jobs with Hermes' job interface.
+`glance_brief v0.3.0` currently ships one verified scheduler adapter: Hermes.
+The repository installer owns files only; an installing Agent creates or updates
+Cron jobs separately through Hermes' native job interface after the user approves
+schedule and delivery.
 
-## Runtime layout after install
+## Installed layout
 
 ```text
 $HERMES_HOME/scripts/glance-brief/
-├── agents-report.py           # entry point for the agents-report job
-├── noon-news.py               # entry point for the noon-news job
-├── agents-quality-check.py    # quality check utility
-├── codexradar.py              # CodexRadar standalone renderer
+├── glance-brief.py              # shared core CLI
+├── agents-report.py             # complete Agents report batch entry point
+├── noon-news.py                 # complete Noon report batch entry point
+├── agents-quality-check.py      # Agents quality utility
+├── codexradar.py                # CodexRadar utility
 └── lib/
-    ├── agents-report/         # business modules (copied verbatim from repo)
-    └── noon-news/
+    ├── glance_brief/            # shared contracts, resolver, renderer, prompts
+    ├── agents-report/           # source producer modules
+    └── noon-news/               # source producer modules
 
 $HERMES_HOME/data/glance-brief/
-├── config/                    # user config (codexradar_watch.json, agents_radar_quality.json)
-├── state/ cache/ output/      # runtime data
-└── install-manifest.json      # installed file hashes + job mapping
+├── config/
+│   ├── brief.example.json       # installed example; never used as live config
+│   ├── brief.json               # user-authored live schema 2 config
+│   └── ...                      # component configs
+├── state/
+├── cache/
+├── output/
+└── install-manifest.json
 ```
 
-Entry points are thin adapters: they resolve `$HERMES_HOME` (default
-`~/.hermes`), set the config/output environment variables, and execute the
-matching module under `lib/` with `runpy`. Business modules are never edited
-in place; a sync replaces them from the repository and verifies hashes.
+The installer never creates `brief.json` automatically because the example uses
+repository fixtures. The installing Agent must create a runtime-specific config
+with real `json_file` or bounded `command_json` sources before creating jobs.
 
-## Environment
+## Execution boundary
 
-The entry points set these variables with `os.environ.setdefault` when
-running; a user or scheduler may override them:
+Each report entry point is a complete batch application:
 
-```text
-AGENTS_RADAR_COLLECTOR            -> lib/agents-report/agents-radar-daily.py
-AGENTS_RADAR_OUTPUT_DIR           -> $HERMES_HOME/data/glance-brief/output/agents-radar
-AGENTS_RADAR_QUALITY_CONFIG       -> $HERMES_HOME/data/glance-brief/config/agents_radar_quality.json
-AGENTS_RADAR_QUALITY_MODULE_DIR   -> lib/agents-report
-CODEXRADAR_CONFIG                 -> $HERMES_HOME/data/glance-brief/config/codexradar_watch.json
-NEWS_AGGREGATOR_SCRIPT            -> $HERMES_HOME/skills/news-aggregator-skill/scripts/fetch_news.py
-NEWS_SUMMARY_SCRIPT               -> $HERMES_HOME/skills/news-summary/scripts/fetch_rss.py
-```
+1. load and validate `brief.json`;
+2. run bounded source adapters and build the immutable candidate registry;
+3. construct the lean model prompt without source URLs;
+4. invoke one `hermes chat` process through the Hermes adapter;
+5. pass raw JSON back to the shared core;
+6. resolve facts and provenance, apply hard gates, and render deterministic Markdown;
+7. print only the verified `report.md` to stdout.
 
-External news skills must be installed separately; `install.py` reports them
-as `missing_external_skills` if absent.
+The shared `glance_brief` package does not import Hermes or select a provider.
+Hermes-specific model invocation exists only in the installed runtime entry point.
 
-## Job script paths
+## `no_agent` jobs
 
-Hermes job `script` is relative to `$HERMES_HOME/scripts/`. After install use:
+Use the installed relative script paths:
 
 ```text
 glance-brief/agents-report.py
 glance-brief/noon-news.py
 ```
 
-Do not point jobs at repository paths (`skills/...`) — the scheduler resolves
-scripts under `$HERMES_HOME/scripts/`.
+Both jobs must set:
 
-## Schedule
+```json
+{"no_agent": true}
+```
 
-The reference schedules are:
+Here `no_agent` means **no outer scheduler Agent**. It does not mean no LLM call,
+zero tokens, or zero cost: the runtime adapter performs one model call inside the
+batch process. Do not add a Cron `prompt`, `prompt_file`, `model`, `provider`, or
+`skills` field; those would either be ignored in script-only mode or encourage a
+second model layer that bypasses deterministic post-processing.
 
-- agents-report: `0 2 * * *` UTC, equivalent to 10:00 Asia/Shanghai
-- noon-news: `30 4 * * *` UTC, equivalent to 12:30 Asia/Shanghai
+Reference schedules in `jobs.example.json` are UTC. Delivery identifiers are
+placeholders and must never be committed with real values.
 
-Set the actual model and delivery target in the local Hermes job
-configuration. Do not commit them here. Hermes schedules are interpreted using
-the scheduler's configured/default timezone; the examples are deliberately
-expressed in UTC. If you use local-time cron expressions, set the scheduler
-timezone explicitly instead of relying on the host timezone.
+## Runtime settings
+
+The entry points use the Hermes runtime default model/provider unless explicitly
+overridden in the scheduler process environment:
+
+```text
+GLANCE_BRIEF_CONFIG          default: $HERMES_HOME/data/glance-brief/config/brief.json
+GLANCE_BRIEF_OUTPUT_DIR      optional explicit artifact directory
+GLANCE_BRIEF_HERMES          default: hermes
+GLANCE_BRIEF_MODEL           optional model override
+GLANCE_BRIEF_PROVIDER        optional provider override
+GLANCE_BRIEF_REASONING       optional reasoning override
+GLANCE_BRIEF_TIMEOUT         default: 600 seconds
+GLANCE_BRIEF_DATE            optional trusted YYYY-MM-DD date
+```
+
+`GLANCE_BRIEF_MODEL_RESPONSE` is reserved for deterministic offline verification;
+it bypasses the model adapter and must not be configured on production jobs.
+
+Producer and utility settings remain runtime-owned, including:
+
+```text
+AGENTS_RADAR_COLLECTOR
+AGENTS_RADAR_OUTPUT_DIR
+AGENTS_RADAR_QUALITY_CONFIG
+AGENTS_RADAR_QUALITY_MODULE_DIR
+CODEXRADAR_CONFIG
+NEWS_AGGREGATOR_SCRIPT
+NEWS_SUMMARY_SCRIPT
+```
+
+External news skills are installed separately. The installer reports missing
+ones as warnings and does not fetch them automatically.
 
 ## Verification
 
+After installing files, writing `brief.json`, and creating approved jobs:
+
 ```bash
-python3 install/install.py verify --runtime hermes
+python3 install/install.py verify --runtime hermes [--prefix <hermes-home>]
+python3 install/install.py doctor --runtime hermes [--prefix <hermes-home>]
 ```
 
-All checks must pass (exit 0) after install and after every sync.
+`verify` fails when owned files drift, the live runtime config is missing/invalid,
+or no installed report entry point is wired to Cron. `doctor` is read-only and
+adds dependency/runtime hints; it never fetches sources or sends a message.

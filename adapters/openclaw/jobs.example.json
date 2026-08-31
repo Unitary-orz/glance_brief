@@ -1,23 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "runtime": "openclaw",
   "template": true,
-  "jobs": [
-    {
-      "name": "agents-report daily",
-      "schedule": "0 2 * * *",
-      "script": "skills/agents-report/scripts/agents_radar_prefetch.py",
-      "prompt_file": "skills/agents-report/prompts/agents-report-v2.md",
-      "model": "<model>",
-      "deliver": "<channel>"
-    },
-    {
-      "name": "noon-news",
-      "schedule": "30 4 * * *",
-      "script": "skills/noon-news/scripts/noon_news_prefetch.py",
-      "prompt_file": "skills/noon-news/prompts/news-brief-v2.md",
-      "model": "<model>",
-      "deliver": "<channel>"
-    }
-  ]
+  "status": "adapter-contract-only",
+  "note": "glance_brief v0.3.0 ships a runtime-independent core and a verified Hermes model adapter. A complete OpenClaw model adapter has not yet been implemented, so this file intentionally advertises no runnable jobs. An OpenClaw adapter must execute one model call, return raw JSON to glance_brief.run_pipeline through the model_runner interface, preserve fail-closed artifacts, and deliver only report.md.",
+  "jobs": []
 }

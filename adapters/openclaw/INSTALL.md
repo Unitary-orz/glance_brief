@@ -1,27 +1,45 @@
-# OpenClaw adapter
+# OpenClaw adapter contract
 
-This directory describes the runtime boundary for OpenClaw. The business scripts do not contain OpenClaw absolute paths.
+`glance_brief v0.3.0` provides a runtime-independent shared core, but it does
+**not** yet ship a complete, verified OpenClaw model adapter. Therefore
+`jobs.example.json` intentionally contains no runnable jobs. The repository must
+not advertise the old producer-plus-prompt pattern as equivalent to the strict
+pipeline: it would let an outer model produce the final report without resolver,
+provenance, or deterministic-renderer gates.
 
-## Required environment
+A future OpenClaw adapter must implement the same boundary as Hermes:
 
-```bash
-export CODEXRADAR_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/codexradar_watch.json"
-export AGENTS_RADAR_OUTPUT_DIR="$OPENCLAW_WORKSPACE/data/brief/output/agents-radar"
-export AGENTS_RADAR_COLLECTOR="$OPENCLAW_WORKSPACE/skills/agents-report/scripts/agents-radar-daily.py"
-export AGENTS_RADAR_QUALITY_CONFIG="$OPENCLAW_WORKSPACE/data/brief/config/agents_radar_quality.json"
-export AGENTS_RADAR_QUALITY_MODULE_DIR="$OPENCLAW_WORKSPACE/skills/agents-report/scripts"
-export AGENTS_RADAR_CRON_OUTPUT_DIR="$OPENCLAW_WORKSPACE/cron/output/<agents-report-job-id>"
-export NEWS_AGGREGATOR_SCRIPT="$OPENCLAW_WORKSPACE/skills/news-aggregator-skill/scripts/fetch_news.py"
-export NEWS_SUMMARY_SCRIPT="$OPENCLAW_WORKSPACE/skills/news-summary/scripts/fetch_rss.py"
-```
+1. call `glance_brief.cli.run_pipeline` with a runtime-owned `model_runner`;
+2. perform exactly one model call and return raw JSON plus usage metadata;
+3. leave facts, URLs, source labels, dates, metrics, category/fresh state, and
+   Markdown under program control;
+4. preserve success/failure artifacts and fail closed on invalid model output;
+5. deliver only the verified `report.md`.
 
-Install the required external news skills separately. The project does not vendor them.
+The runtime must own workspace paths, model/provider settings, timeout, schedule,
+and delivery. Real paths, credentials, task IDs, and delivery targets must not be
+committed.
 
-Use the prompt files in:
+Existing producer/utility environment names remain part of the portability
+contract and may be used by a future adapter:
 
 ```text
-skills/agents-report/prompts/agents-report-v2.md
-skills/noon-news/prompts/news-brief-v2.md
+CODEXRADAR_CONFIG
+AGENTS_RADAR_OUTPUT_DIR
+AGENTS_RADAR_COLLECTOR
+AGENTS_RADAR_QUALITY_CONFIG
+AGENTS_RADAR_QUALITY_MODULE_DIR
+NEWS_AGGREGATOR_SCRIPT
+NEWS_SUMMARY_SCRIPT
 ```
 
-Set schedule, model, and delivery target in the OpenClaw task configuration, not in the reusable Skill.
+Until the adapter is implemented and covered by an installed-entrypoint test,
+use the shared core only for offline validation with an explicit model response:
+
+```bash
+python3 -m glance_brief run \
+  --config config/brief.example.json \
+  --report noon-news \
+  --output-dir /tmp/glance-brief-noon \
+  --model-response <runtime-supplied-model-response.json>
+```

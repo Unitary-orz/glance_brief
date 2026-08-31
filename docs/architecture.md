@@ -1,95 +1,87 @@
-# Architecture
+# glance_brief v0.3.0 Architecture
 
 ## 目标
 
-让同一套简报逻辑可以在不同 Agent runtime 中运行，同时降低同步、排错和格式回归的成本。
+把来源事实、模型语义和最终格式分开，使两份日报可追溯、可回放、可在不同 Agent runtime 中运行，并在任一契约失败时 fail closed。
 
-## 分层
+## 数据流
 
 ```text
 外部来源
-  │
-  ▼
-预取层（Python，输出 JSON）
-  │
-  ├── agents-radar collector
-  ├── AI HOT client
-  ├── CodexRadar reader/ranker
-  └── news-aggregator / RSS collectors
-  │
-  ▼
-数据契约（schema_version: 1）
-  │
-  ▼
-Prompt / Skill 层
-  │
-  ├── 事实边界
-  ├── 来源字段映射
-  ├── Markdown 输出结构
-  └── Self-check 规则
-  │
-  ▼
-Runtime adapter
-  │
-  ├── Hermes Cron
-  └── OpenClaw Cron
-  │
-  ▼
-消息渠道
+  ↓
+producer / prefetch（来源调用、重试、原始 JSON）
+  ↓
+bounded adapters（json_file / command_json）
+  ↓
+immutable candidate registry（事实与 provenance）
+  ↓
+lean semantic payload（无 URL、日期、来源 metadata、指标或 Markdown）
+  ↓
+单轮模型 JSON（选择、摘要、翻译、趋势）
+  ↓
+resolver（candidate_id 回填不可变事实）
+  ↓
+strict validator
+  ↓
+deterministic renderer
+  ↓
+report.md + manifest.json + replay artifacts
+  ↓
+runtime adapter / delivery
 ```
 
-## 组件职责
+## 所有权边界
 
-### 预取脚本
+### Producer 与 adapter
 
-预取脚本只负责：
+负责：
 
-- 调用来源
-- 重试和超时
-- 保留来源 URL 和原始字段
-- 返回成功 / 失败状态
-- 输出 JSON
+- 调用来源、重试、超时和受控环境；
+- 保留原始 URL、标题、发布时间、项目身份、指标和分类；
+- 将来源映射为有稳定 `candidate_id` 的 registry；
+- 拒绝标题或证据文本中夹带 URL 等不安全候选，并记录 `candidate_rejections`；
+- 执行来源级 `required` 和报告级 `minimum_candidates`。
 
-预取脚本不负责：
+不负责摘要、翻译或最终 Markdown。
 
-- 生成最终新闻摘要
-- 改写来源 URL
-- 决定 Feishu / Telegram 等投递方式
-- 输出最终报告 Markdown
+### 模型
 
-### Prompt / Skill
+只负责：
 
-Prompt 只负责：
+- 从 payload 内候选选择 `candidate_id`；
+- 对单个候选写忠实摘要；
+- 为英文原题提供可选中文对照；
+- 写不含项目身份和指标的总体趋势。
 
-- 如何使用已经预取的数据
-- 如何去重和压缩
-- 如何保持固定排版
-- 如何在证据不足时降级
+模型不得返回 URL、来源、日期、项目事实、指标、Markdown，不得跨候选合并事实或自行换算数字。
 
-Prompt 不应再次调用网络工具或脚本。
+### Resolver、validator 与 renderer
+
+负责：
+
+- 只接受 registry 中的候选 ID；
+- 从 registry 回填原题、URL、来源、时间、项目身份、指标和分类；
+- 验证数字 provenance、选择数量、安全文本、GitHub URL 和 producer quality；
+- 生成固定 Markdown；
+- 在失败时删除旧 `report.md`，保留 raw response、诊断和 failed manifest。
 
 ### Runtime adapter
 
-Adapter 负责：
+只负责本地路径、配置、模型/provider、Cron 时间、投递目标、锁和超时。真实 Job ID、聊天 ID、凭据和用户配置不得进入仓库。
 
-- Cron 时间和时区
-- 脚本路径
-- 外部 Skill 路径
-- 本地配置路径
-- 模型和投递目标
+## 版本与协议
 
-真实 Job ID、聊天 ID、模型和凭据不能进入通用 Skill。
+- 仓库版本：`v0.3.0`；
+- producer 输入可继续使用 `schema_version: 1`，由 adapters 消化；
+- canonical / resolved 报告使用 `schema_version: 2`；
+- `glance_brief/` 是两份报告共用的正式业务包；
+- 不支持旧模型响应、legacy fixture、converter 或多协议运行分支。
 
-## 重要设计取舍
+## 运行约束
 
-当前不把项目改造成 `src/glance_brief` Python package。脚本需要被 Cron 直接执行，保持 standalone scripts 可以降低安装成本和运行时耦合。
-
-只有在公共模块重复明显、并且已经有测试覆盖后，才抽取 shared library；不要为了形式上的“标准化”提前增加抽象层。
-
-## 数据流约束
-
-- 每次任务只预取一次。
-- Prompt 直接读取预取 JSON。
-- 来源失败只影响对应板块。
-- 不跨来源补写没有证据的内容。
-- 所有输出格式变化必须先更新输出契约和快照测试。
+- 每次任务只采集一次来源快照；
+- `command_json` 必须使用 argv、受控 cwd、timeout 和环境 allowlist；
+- 模型调用为单轮，不能调用 producer 工具；
+- 每次运行使用独立 artifact 目录；
+- replay 先验证 manifest SHA-256，不重新读取来源或调用模型；
+- 正式 installer/Cron 切换必须作为单独变更并明确授权。

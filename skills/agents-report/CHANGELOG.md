@@ -1,5 +1,12 @@
 # agents-report changelog
 
+## 0.3.0 — 2026-08-31
+
+- 对外版本统一为 glance_brief v0.3.0，并接入项目级正式 `glance_brief` core。
+- 引入 candidate registry、lean semantic payload、resolver、strict validator 和 deterministic renderer。
+- 模型不再拥有 URL、来源、项目事实、指标、分类、fresh、Codex block 或 Markdown。
+- 增加 required、minimum candidates、quality、GitHub URL、manifest、replay 和 tamper rejection 门禁。
+
 ## 0.2.0 — 2026-08-10
 
 - 安装说明增加正式入口：按根目录 `INSTALL.md` 的 Agent 安装契约执行。

@@ -1,9 +1,8 @@
 ---
 name: noon-news
 description: >-
-  每日午间热点简报 Skill。
-  预取多源新闻和 AI HOT 数据，按固定模板生成可追溯简报；
-  来源以引用块单独一行呈现，链接可点击、不显示 URL 明文。
+  每日午间热点简报 Skill。预取国际、宏观商业和 AI 来源，按
+  glance_brief v0.3.0 契约生成单候选、可追溯、确定性渲染的简报。
 triggers:
   - noon-news
   - 今日热点简报
@@ -11,43 +10,66 @@ triggers:
   - 今日新闻
 ---
 
-# noon-news
+# noon-news — glance_brief v0.3.0
 
-## 运行入口
+## 正式入口
+
+两份报告共享项目级 `glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
 
 ```bash
-python3 skills/noon-news/scripts/noon_news_prefetch.py
+python3 -m glance_brief check --config config/brief.example.json
+python3 -m glance_brief probe --config config/brief.example.json --report noon-news
 ```
 
-脚本输出一个 `schema_version: 1` 的 JSON，供 Prompt 格式化。它不会发送消息。
+Hermes 安装后使用 `glance-brief/noon-news.py`。该入口完成来源读取、一次模型调用、严格解析、resolver、确定性渲染和 artifacts；Cron 使用 `no_agent: true`，不再附加外层 Prompt。`no_agent` 只关闭外层 Agent，不表示无模型调用。
+
+`noon_news_prefetch.py` 是可选 producer，不是最终报告入口，也不发送报告。
 
 ## 数据来源
 
-按当前配置预取：
+- news-summary：国际新闻；
+- news-aggregator：宏观、商业与综合新闻；
+- AI HOT：AI 主线；必要时可使用 producer 提供的 V2EX 条目。
 
-1. news-aggregator
-2. news-summary RSS
-3. AI HOT v1 全局精选（`/api/v1/items`，默认 `mode=selected&window=24h&by=timeline`）
+URL、来源标签、发布时间和原题必须来自 producer，不得搜索、猜测或拼接。
 
-AI HOT 条目使用 v1 字段：媒体名取 `source.name`，原文链接取 `links.original`，AI HOT 链接取 `links.aihot`；分页信息取 `page.count`、`page.hasMore` 和 `page.nextCursor`。
+## 所有权边界
 
-外部脚本通过环境变量指定，不写死 OpenClaw 或 Hermes 路径。
+模型只返回：
 
-## Prompt
+- 每条唯一 `candidate_id`；
+- 单候选事实摘要；
+- 英文原题的可选中文对照；
+- 绑定已选详情的今日要点。
 
-当前 V1 可见格式与独立 V2 语义契约分别见：
+模型不得返回 URL、来源、日期、Markdown，不得跨候选合并事实或换算数字。
 
-```text
-prompts/news-brief-v2.md
-v2/prompts/noon-news.md
-```
+程序负责回填原题、来源、精确 URL、发布时间，验证数字 provenance、selection limits 和安全文本，并生成固定 Markdown。完整语义契约见 `glance_brief/prompts/noon-news.md`，可见格式见 `docs/output-contracts.md`。
 
-V1 的格式规则保持不变：每条详情固定为连续三行——第 1 行只写原文标题（英文标题可带中文对照翻译），第 2 行只写一句事实描述，第 3 行只写来源引用；禁止把标题与描述合并为“标题：描述”。来源单独一行用引用块（`> 来源：`），不并入事实描述行；链接以 Markdown 嵌入、正文不显示 URL 明文。标题保留脚本原始 `title`：只有英文原始标题才在后面加中文对照翻译括号，中文、日文等非英文标题直接写原题、不加翻译括号。来源链接文字内冒号替换为 `•`（内容保留）、`公众号` 统一替换为 `WX`；所有来源用 `•` 连接，同渠道去重（渠道只写一次），每条最多 2 个渠道，超过时只保留前 2 个并加 `+N`。只增加链接时不得改动标题、章节或换行结构。完整 V1 规则以 `prompts/news-brief-v2.md` 为唯一格式来源。
+## 固定结构
 
-独立 V2 使用 producer adapters → immutable schema → validator → deterministic renderer → preview 流程。模型只返回单个候选 ID、摘要、英文原题的可选中文对照和全局要点；不返回 URL、来源、日期、指标或 Markdown，也不合并多个候选。程序负责回填原题、来源、精确 URL 和发布时间，并严格验证引用、provenance 与安全文本。V2 只有 schema v2 单协议，不读取旧 fixture 或旧模型结构；失败时保留原始响应与 `failure.json`，不得生成正式 Markdown。
+1. `国际要闻`；
+2. `宏观与商业`；
+3. `AI 主线`。
+
+每条详情固定三行：
+
+1. 原始标题；仅英文标题可附约 12–28 字中文对照；
+2. 一句候选支持的事实；
+3. 独立来源引用块。
+
+来源链接正文不显示 URL 明文；同渠道去重，每条最多两个渠道，更多显示 `+N`。AI HOT 条目页与原文链接分层保留。
 
 ## 失败处理
 
-- 单个来源失败：保留其他可用来源，并在数据中保留失败状态。
-- 所有来源失败：输出固定失败提示。
-- 内容不足：少报或省略，不用无关来源凑数。
+- 含 URL 或 unsafe Markdown 的候选语义字段在 adapter 边界拒绝并记录 `candidate_rejections`；同来源其他合法候选继续；
+- required 来源失败、板块低于 `minimum_candidates`、最终选择超出 `selection_limits`：hard fail；
+- malformed 模型响应或数字/ID/provenance 契约失败：保留 raw response、`failure.json` 和 failed manifest，不生成 `report.md`；
+- 不用常识、旧缓存或其他来源伪造失败板块。
+
+## 配置与发布边界
+
+- `config/brief.example.json` 只用于离线结构示例；安装后必须创建真实 schema 2 `brief.json`；
+- 模型/provider/timeout、schedule 和 delivery 属于 runtime adapter；
+- OpenClaw 在 v0.3.0 仅有 adapter contract，没有可运行 Job；
+- 真实配置不得提交；正式 Cron 切换必须先 dry-run、审查并获得明确授权。

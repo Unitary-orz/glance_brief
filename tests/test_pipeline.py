@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from v2 import adapters, run_v2
+from glance_brief import adapters, cli
 
 
 class AssemblyAndPayloadTests(unittest.TestCase):
@@ -124,7 +124,7 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertEqual(len(assembled["candidate_registry"]), 2)
             self.assertEqual(len(assembled["sections"]["international"]), 1)
             self.assertEqual(len(assembled["sections"]["macro_business"]), 1)
-            payload = run_v2.build_model_payload("noon-news", assembled)
+            payload = cli.build_model_payload("noon-news", assembled)
             self.assertEqual(payload["selection_limits"]["international"], {"min": 1, "max": 2})
             payload_text = json.dumps(payload, ensure_ascii=False)
             self.assertIn("candidate_id", payload_text)
@@ -133,6 +133,31 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertNotIn("https://wire.test/1", payload_text)
             self.assertNotIn("provenance", payload_text)
             self.assertNotIn("published_at", payload_text)
+
+    def test_unsafe_candidate_url_is_rejected_without_poisoning_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            config = self._config(directory)
+            source_path = directory / "noon.json"
+            source = json.loads(source_path.read_text(encoding="utf-8"))
+            source["items"].append({
+                "title": "Crawler community: https://discord.example/invite",
+                "summary": "Join here https://discord.example/invite",
+                "category": "business",
+                "url": "https://wire.test/unsafe",
+            })
+            source_path.write_text(json.dumps(source), encoding="utf-8")
+
+            assembled = adapters.assemble_report(config, "noon-news", directory)
+            payload = cli.build_model_payload("noon-news", assembled)
+            payload_text = json.dumps(payload, ensure_ascii=False)
+
+            self.assertNotIn("discord.example", payload_text)
+            self.assertEqual(len(payload["sections"]["macro_business"]), 1)
+            self.assertEqual(
+                assembled["candidate_rejections"]["wire"],
+                [{"index": 2, "error": "candidate title/text must not contain a URL"}],
+            )
 
     def test_candidate_digest_does_not_depend_on_position(self):
         source = {
@@ -149,7 +174,7 @@ class AssemblyAndPayloadTests(unittest.TestCase):
     def test_command_json_only_receives_allowlisted_environment(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            variable = "GLANCE_V2_TEST_SECRET"
+            variable = "GLANCE_BRIEF_TEST_SECRET"
             previous = os.environ.get(variable)
             os.environ[variable] = "must-not-leak"
             try:
@@ -158,7 +183,7 @@ class AssemblyAndPayloadTests(unittest.TestCase):
                     "command": [
                         sys.executable,
                         "-c",
-                        "import json,os; print(json.dumps({'secret': os.getenv('GLANCE_V2_TEST_SECRET')}))",
+                        "import json,os; print(json.dumps({'secret': os.getenv('GLANCE_BRIEF_TEST_SECRET')}))",
                     ],
                     "cwd": str(directory),
                     "env_allowlist": [],
@@ -175,8 +200,8 @@ class AssemblyAndPayloadTests(unittest.TestCase):
 
 
 class OfflinePipelineTests(unittest.TestCase):
-    CONFIG = ROOT / "v2" / "config" / "brief.example.json"
-    CLI = ROOT / "v2" / "run_v2.py"
+    CONFIG = ROOT / "config" / "brief.example.json"
+    CLI = ROOT / "glance_brief" / "cli.py"
 
     def _assembled(self, report):
         config = json.loads(self.CONFIG.read_text(encoding="utf-8"))
@@ -359,7 +384,7 @@ class OfflinePipelineTests(unittest.TestCase):
             completed = self._run("agents-report", model, output)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             markdown = (output / "report.md").read_text(encoding="utf-8")
-            codex = json.loads((ROOT / "v2" / "fixtures" / "codexradar.json").read_text(encoding="utf-8"))["markdown"]
+            codex = json.loads((ROOT / "tests" / "fixtures" / "pipeline" / "codexradar.json").read_text(encoding="utf-8"))["markdown"]
             self.assertIn(codex, markdown)
             self.assertIn("**✨新热门开源**", markdown)
             self.assertIn("[fixture-labs/agent-workflow](https://github.com/fixture-labs/agent-workflow)", markdown)

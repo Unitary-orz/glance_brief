@@ -1,4 +1,4 @@
-"""Deterministic Markdown rendering for Brief V2 resolved reports."""
+"""Deterministic Markdown rendering for glance_brief v0.3.0 resolved reports."""
 from __future__ import annotations
 
 import re

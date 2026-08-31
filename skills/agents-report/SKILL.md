@@ -1,9 +1,8 @@
 ---
 name: agents-report
 description: >-
-  每日 AI / Agents 生态报告 Skill。
-  整合 agents-radar、AI HOT 和 CodexRadar 数据，输出 AI 生态动态、
-  模型效率和开源热点趋势。核心脚本可独立运行，定时投递由 runtime adapter 配置。
+  每日 AI / Agents 生态报告 Skill。整合 AI HOT、CodexRadar、agents-radar
+  和本地开源雷达，按 glance_brief v0.3.0 契约生成可追溯报告。
 triggers:
   - agents-report
   - agents-radar
@@ -11,66 +10,63 @@ triggers:
   - AI 生态日报
 ---
 
-# agents-report
+# agents-report — glance_brief v0.3.0
 
-## 运行入口
+## 正式入口
+
+两份报告共享项目级 `glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
 
 ```bash
-python3 skills/agents-report/scripts/agents_radar_prefetch.py
+python3 -m glance_brief check --config config/brief.example.json
+python3 -m glance_brief probe --config config/brief.example.json --report agents-report
 ```
 
-脚本输出一个 `schema_version: 1` 的 JSON，供 Prompt 格式化。它不会发送消息。
+Hermes 安装后使用 `glance-brief/agents-report.py`。该入口完成来源读取、一次模型调用、严格解析、resolver、确定性渲染和 artifacts；Cron 使用 `no_agent: true`，不再附加外层 Prompt。`no_agent` 只关闭外层 Agent，不表示无模型调用。
 
-## 脚本
-
-- `agents_radar_prefetch.py`：Agents、AI HOT 和 CodexRadar 预取编排
-- `agents-radar-daily.py`：agents-radar RSS 原始采集器
-- `codexradar_efficiency.py`：CodexRadar 读取、排序和 Markdown 渲染
-- `open_source_quality.py`：离线检查来源项目链接、分类和数量约束
-- `agents_radar_quality_check.py`：检查来源文本或最终 Markdown 报告
+`agents_radar_prefetch.py`、`agents-radar-daily.py`、`codexradar_efficiency.py` 等是 producer/utility，不是最终报告入口，也不发送报告。
 
 ## 数据来源
 
-- agents-radar：`https://duanyytop.github.io/agents-radar/feed.xml`
-- AI HOT v1：`/api/v1/items?mode=selected&window=24h&by=timeline&limit=20`；分类读取 `items[*].category`，不假定固定分类名称
-- CodexRadar：公开 snapshot，失败时回退原始评测表
+- AI HOT：AI 生态动态；
+- CodexRadar：producer-owned 模型效率 Markdown；
+- agents-radar / 本地开源雷达：hot、fresh、分类与项目事实。
 
-## 配置
+真实路径与用户配置由 runtime adapter 提供，不写入 Skill。
 
-复制：
+## 所有权边界
 
-```text
-config/codexradar_watch.example.json
-config/agents_radar_quality.example.json
-```
+模型只选择 AI 动态候选、写单候选摘要和恰好两条总体趋势。模型不得返回 URL、来源、日期、项目名、模型名、指标、fresh、分类、Codex 内容或 Markdown。
 
-为：
+程序负责：
 
-```text
-config/codexradar_watch.json
-config/agents_radar_quality.json
-```
+- 从 candidate registry 回填 AI 动态来源；
+- 验证并逐字插入 `codexradar.markdown`；
+- 从 `hot_today`、`fresh_hot`、`local_report_categories` 恢复项目事实；
+- 验证 GitHub URL、quality、fresh 子集和分类唯一完整覆盖；
+- deterministic render、manifest 和 replay。
 
-分别通过 `CODEXRADAR_CONFIG` 和 `AGENTS_RADAR_QUALITY_CONFIG` 指定。真实配置不要提交到公共仓库。
+完整语义契约见 `glance_brief/prompts/agents-report.md`，可见格式见 `docs/output-contracts.md`。
 
-## 输出规则
+## 固定结构
 
-完整格式契约见：
+1. `🤖 AI 生态动态`；
+2. producer-owned CodexRadar block；
+3. `🔥 开源热点趋势`；
+4. 非空时唯一的 `✨新热门开源`；
+5. producer 分类板块。
 
-```text
-prompts/agents-report-v2.md
-```
-
-当前固定板块为：
-
-1. `🤖 AI 生态动态`
-2. `🧠 CodexRadar 智力效率`
-3. `🔥 开源热点趋势`
-
-报告格式变更必须先更新 Prompt、输出契约和测试，不要只改运行时 Cron。
+独立本地雷达的 `new_projects` 不在主报告重复展示。
 
 ## 失败处理
 
-- agents-radar 失败或正文选择失败：输出 `⚠️ agents-radar 报告获取失败，请检查网络`，不要用常识补齐。
-- AI HOT 请求失败或全局精选为空：只影响 AI 生态动态；证据不足时写“信息有限”，不得把固定分类为空表述成整个 AI HOT 没有新条目。
-- CodexRadar 失败：原样使用脚本中的“信息有限”提示。
+- 必选来源失败、候选不足、雷达 quality 非 `ok`、Codex block 缺失、fresh/category/project 契约失败：模型调用前或 renderer 前 hard fail；
+- 非 required 来源失败：记录 `source_errors`，其余来源可继续；
+- malformed 模型响应：保留 raw response、`failure.json` 和 failed manifest，不生成 `report.md`；
+- 不用常识、旧缓存或搜索结果补写 producer 未提供的项目事实。
+
+## 配置与发布边界
+
+- `config/brief.example.json` 只用于离线结构示例；安装后必须创建真实 schema 2 `brief.json`；
+- 模型/provider/timeout、schedule 和 delivery 属于 runtime adapter；
+- OpenClaw 在 v0.3.0 仅有 adapter contract，没有可运行 Job；
+- 真实配置不得提交；Runtime/Cron 变更必须先 dry-run，并获得明确授权。

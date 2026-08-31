@@ -1,44 +1,78 @@
-# Runtime Adapters
+# glance_brief v0.3.0 Runtime Adapters
 
-## 原则
+## Boundary
 
-Skill 和预取脚本不保存运行时状态。运行时 adapter 才提供：
+The shared `glance_brief/` package is runtime-independent. It owns:
 
-- 脚本实际路径
-- 外部 Skill 路径
-- 本地配置路径
-- Cron schedule
-- 模型和投递目标
+- bounded `json_file` and argv-based `command_json` source loading;
+- immutable candidates and provenance;
+- lean model prompts;
+- model-response validation and hard gates;
+- resolution, deterministic Markdown, artifacts, manifests, and replay.
 
-## Hermes
+A runtime adapter owns only:
 
-参考 `adapters/hermes/`：
+- runtime paths and external source entry points;
+- one model invocation and usage metadata;
+- model/provider/reasoning/timeout configuration;
+- schedule, timezone, and delivery;
+- process-level failure reporting.
 
-- Job 脚本使用 `skills/agents-report/scripts/agents_radar_prefetch.py` 和 `skills/noon-news/scripts/noon_news_prefetch.py`
-- `CODEXRADAR_CONFIG` 指向 Hermes data 下的用户配置
-- `AGENTS_RADAR_OUTPUT_DIR` 指向 Hermes data 下的输出目录
-- `NEWS_AGGREGATOR_SCRIPT` 和 `NEWS_SUMMARY_SCRIPT` 指向已安装 Skill
+Real job IDs, chat IDs, credentials, user paths, and private model configuration
+must never be committed.
 
-## OpenClaw
+## Hermes: verified in v0.3.0
 
-参考 `adapters/openclaw/`：
+`install/install.py` installs the shared core and thin Hermes report entry points.
+Each report entry point runs the complete batch pipeline:
 
-- 使用项目中对应 Skill 的脚本路径
-- 通过环境变量提供 OpenClaw workspace 下的外部 Skill 路径
-- 不把 `/root/.openclaw` 写入业务脚本
+```text
+sources
+→ candidate registry
+→ lean prompt
+→ one Hermes model call
+→ strict JSON parser
+→ resolver + hard gates
+→ deterministic renderer
+→ verified report.md on stdout
+```
 
-## 配置边界
+The report Cron jobs use `no_agent: true`. This means the scheduler does not
+start a second outer Agent; it does **not** mean the task performs no model call
+or has no token cost. Adding an outer Cron prompt would break the post-model
+validation boundary.
 
-可以提交：
+The core never imports Hermes. `hermes chat` and optional model/provider overrides
+exist only in the installed Hermes adapter. See `adapters/hermes/INSTALL.md`.
 
-- `*.example.json`
-- `*.example.env`
-- 不含真实目标的 Cron 模板
+Before scheduler wiring, the installing Agent must create a real schema 2
+`data/glance-brief/config/brief.json`. The installed example points at repository
+fixtures and is not a live configuration.
 
-不能提交：
+## OpenClaw: contract only in v0.3.0
 
-- 真实聊天 ID
-- 真实 Job ID
-- API key、token、密码
-- 本地生成报告
-- 用户私有模型配置
+No verified OpenClaw model adapter is shipped. `adapters/openclaw/jobs.example.json`
+therefore contains no runnable jobs. A future adapter must inject one model runner
+into the shared core and preserve the same fail-closed artifact and renderer
+boundary before it can advertise scheduler templates.
+
+The old pattern of running a producer and asking an outer task prompt to format
+the final report is not equivalent and is not supported as the v0.3.0 strict
+pipeline.
+
+## Repository policy
+
+May be committed:
+
+- example JSON/environment files without private values;
+- runtime-independent adapter code;
+- placeholder scheduler templates;
+- deterministic fixtures and verification scripts.
+
+Must not be committed:
+
+- real job/chat/delivery identifiers;
+- API keys, tokens, passwords, cookies, or connection strings;
+- generated source snapshots, artifacts, or reports;
+- user model/provider configuration;
+- machine-specific absolute runtime paths.

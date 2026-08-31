@@ -3,7 +3,7 @@
   "sources": {
     "news_wire": {
       "driver": "json_file",
-      "path": "../fixtures/news.json",
+      "path": "../tests/fixtures/pipeline/news.json",
       "items_path": "items",
       "channel_id": "news-summary",
       "channel_label": "NS",
@@ -26,7 +26,7 @@
     },
     "ai_digest": {
       "driver": "json_file",
-      "path": "../fixtures/ai.json",
+      "path": "../tests/fixtures/pipeline/ai.json",
       "items_path": "payload.entries",
       "channel_id": "aihot",
       "channel_label": "AIHOT",
@@ -53,7 +53,7 @@
     },
     "open_source_radar": {
       "driver": "json_file",
-      "path": "../fixtures/open-source.json",
+      "path": "../tests/fixtures/pipeline/open-source.json",
       "items_path": "signals.hot_today",
       "channel_id": "github",
       "channel_label": "GitHub",
@@ -85,7 +85,7 @@
     },
     "codex_radar": {
       "driver": "json_file",
-      "path": "../fixtures/codexradar.json",
+      "path": "../tests/fixtures/pipeline/codexradar.json",
       "items_path": "items",
       "channel_id": "codexradar",
       "channel_label": "CodexRadar",

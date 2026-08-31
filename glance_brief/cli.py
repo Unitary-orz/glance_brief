@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot Brief V2 pipeline: assemble, model, resolve, validate, render.
+"""One-shot glance_brief v0.3.0 pipeline: assemble, model, resolve, validate, render.
 
 The CLI owns artifacts and process boundaries.  Facts and Markdown remain in
 adapters/resolvers/renderers; the model receives only lean semantic evidence.
@@ -10,10 +10,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
-import subprocess
 import sys
-import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -21,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from v2 import adapters, contracts, render_report, resolve
+    from glance_brief import adapters, contracts, render_report, resolve
 else:
     from . import adapters, contracts, render_report, resolve
 
@@ -178,66 +175,6 @@ def build_model_prompt(contract: str, payload: Mapping[str, Any]) -> str:
     )
 
 
-def invoke_hermes(
-    prompt: str,
-    *,
-    hermes: str,
-    model: str,
-    provider: str,
-    reasoning: str | None,
-    timeout: float,
-) -> tuple[str, dict[str, Any]]:
-    argv = [
-        hermes,
-        "chat",
-        "-q",
-        prompt,
-        "--model",
-        model,
-        "--provider",
-        provider,
-        "--toolsets",
-        "safe",
-        "--ignore-rules",
-        "--source",
-        "tool",
-        "--max-turns",
-        "1",
-        "--quiet",
-    ]
-    if reasoning:
-        argv.extend(["--reasoning", reasoning])
-    started = time.monotonic()
-    try:
-        completed = subprocess.run(
-            argv,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-            check=False,
-            shell=False,
-            env=os.environ.copy(),
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"Hermes model call timed out after {timeout:g}s") from exc
-    except OSError as exc:
-        raise RuntimeError(f"could not start Hermes: {exc}") from exc
-    usage = {
-        "mode": "hermes-one-shot",
-        "model": model,
-        "provider": provider,
-        "reasoning": reasoning,
-        "elapsed_seconds": round(time.monotonic() - started, 3),
-        "returncode": completed.returncode,
-    }
-    if completed.returncode:
-        detail = (completed.stderr or completed.stdout).strip()
-        raise RuntimeError(f"Hermes exited with {completed.returncode}: {detail}")
-    return completed.stdout, usage
-
-
 def _report_date(value: str | None) -> str:
     selected = value or dt.datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
     return contracts.date(selected, "report date")
@@ -251,7 +188,7 @@ def _clear_known_artifacts(output: Path) -> None:
             path.unlink()
 
 
-def run_pipeline(args: argparse.Namespace) -> Path:
+def run_pipeline(args: argparse.Namespace, *, model_runner=None) -> Path:
     output = args.output_dir.resolve()
     _clear_known_artifacts(output)
     failure_path = output / "failure.json"
@@ -271,14 +208,14 @@ def run_pipeline(args: argparse.Namespace) -> Path:
         if args.model_response is not None:
             raw = args.model_response.read_text(encoding="utf-8")
             usage = {"mode": "fixture", "model_response": str(args.model_response.resolve())}
+        elif model_runner is not None:
+            raw, usage = model_runner(prompt)
+            if not isinstance(raw, str) or not isinstance(usage, Mapping):
+                raise contracts.ContractError("runtime model runner must return (raw_text, usage_mapping)")
+            usage = dict(usage)
         else:
-            raw, usage = invoke_hermes(
-                prompt,
-                hermes=args.hermes,
-                model=args.model,
-                provider=args.provider,
-                reasoning=args.reasoning,
-                timeout=args.timeout,
+            raise contracts.ContractError(
+                "runtime-independent core requires --model-response or an injected model runner"
             )
         write_text(output / "model-response.raw.txt", raw)
         write_json(output / "usage.json", usage)
@@ -304,9 +241,9 @@ def run_pipeline(args: argparse.Namespace) -> Path:
             status="ok",
             extra={
                 "config_sha256": _sha256(args.config.resolve()),
-                "model": args.model,
-                "provider": args.provider,
-                "reasoning": args.reasoning,
+                "model": usage.get("model"),
+                "provider": usage.get("provider"),
+                "reasoning": usage.get("reasoning"),
                 "mode": "run",
                 "report_date": report_date,
                 "resolved_generated_at": generated_at,
@@ -413,10 +350,10 @@ def replay_pipeline(args: argparse.Namespace) -> Path:
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(description="isolated deterministic glance_brief V2")
+    root = argparse.ArgumentParser(description="deterministic glance_brief v0.3.0 pipeline")
     commands = root.add_subparsers(dest="command", required=True)
 
-    check = commands.add_parser("check", help="validate a V2 source/report config")
+    check = commands.add_parser("check", help="validate a v0.3.0 source/report config")
     check.add_argument("--config", required=True, type=Path)
 
     probe = commands.add_parser("probe", help="assemble one report without a model call")
@@ -427,13 +364,9 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--config", required=True, type=Path)
     run.add_argument("--report", required=True, choices=REPORTS)
     run.add_argument("--output-dir", required=True, type=Path)
-    run.add_argument("--model-response", type=Path, help="offline JSON response; omit for a Hermes one-shot")
-    run.add_argument("--hermes", default="hermes")
-    run.add_argument("--model", default="MiniMax-M3")
-    run.add_argument("--provider", default="minimax-cn")
-    run.add_argument("--reasoning", choices=("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"))
-    run.add_argument("--timeout", type=float, default=600.0)
+    run.add_argument("--model-response", type=Path, help="runtime-supplied JSON response; required by the standalone CLI")
     run.add_argument("--date", help="trusted YYYY-MM-DD report date")
+    run.add_argument("--stdout-report", action="store_true", help="write report Markdown to stdout instead of its path")
 
     replay = commands.add_parser("replay", help="re-resolve and render a verified prior run")
     replay.add_argument("--input-dir", required=True, type=Path)
@@ -459,10 +392,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(assembled, ensure_ascii=False, indent=2, sort_keys=True))
             return 0
         path = run_pipeline(args)
-        print(path)
+        if args.stdout_report:
+            print(path.read_text(encoding="utf-8"), end="")
+        else:
+            print(path)
         return 0
     except (OSError, TypeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
-        print(f"V2 pipeline error: {exc}", file=sys.stderr)
+        print(f"glance_brief v0.3.0 pipeline error: {exc}", file=sys.stderr)
         return 1
 
 

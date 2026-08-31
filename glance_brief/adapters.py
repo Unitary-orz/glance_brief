@@ -1,10 +1,11 @@
-"""Source loading and provenance-preserving candidate adapters for Brief V2."""
+"""Source loading and provenance-preserving adapters for glance_brief v0.3.0."""
 from __future__ import annotations
 
 import copy
 import hashlib
 import json
 import os
+import re
 import subprocess
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
@@ -139,6 +140,8 @@ def normalize_candidate(source_id: str, source: Mapping[str, Any], raw: Mapping[
         raise contracts.ContractError("candidate title and text must be strings")
     if not title.strip() and not text.strip():
         raise contracts.ContractError("candidate needs title or text")
+    if re.search(r"https?://", title, re.I) or re.search(r"https?://", text, re.I):
+        raise contracts.ContractError("candidate title/text must not contain a URL")
     published = _pick(raw, mapping["published_at"], "map.published_at") if "published_at" in mapping else None
     if published is not None and not isinstance(published, str):
         raise contracts.ContractError("candidate published_at must be a string")
@@ -429,12 +432,22 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
     loaded: dict[str, list[dict[str, Any]]] = {}
     snapshots: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
+    rejections: dict[str, list[dict[str, Any]]] = {}
     for source_id in referenced:
         source = config["sources"][source_id]
         try:
             payload = load_source(source_id, source, config_dir)
-            loaded[source_id] = [normalize_candidate(source_id, source, raw) for raw in _items(payload, source)]
             snapshots[source_id] = _snapshot(payload, source)
+            normalized: list[dict[str, Any]] = []
+            source_rejections: list[dict[str, Any]] = []
+            for index, raw in enumerate(_items(payload, source)):
+                try:
+                    normalized.append(normalize_candidate(source_id, source, raw))
+                except contracts.ContractError as exc:
+                    source_rejections.append({"index": index, "error": str(exc)})
+            loaded[source_id] = normalized
+            if source_rejections:
+                rejections[source_id] = source_rejections
         except Exception as exc:
             loaded[source_id] = []
             snapshots[source_id] = {}
@@ -485,6 +498,8 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
         result["selection_limits"] = copy.deepcopy(report["selection_limits"])
     if errors:
         result["source_errors"] = errors
+    if rejections:
+        result["candidate_rejections"] = rejections
     return result
 
 

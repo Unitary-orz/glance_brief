@@ -1,4 +1,4 @@
-# Output Contracts
+# glance_brief v0.3.0 Output Contracts
 
 输出格式是公开接口。模型只返回语义 JSON；下列 Markdown 由程序确定性生成。
 
@@ -67,9 +67,10 @@
 - AIHOT 条目页 URL 与原文 URL 是两个 provenance link，分别保留；renderer 使用 producer 提供的精确 URL。
 - 来源标签中的层级冒号规范为空格；同渠道 URL 去重，渠道内及渠道间统一用 `•` 连接，每条最多两个渠道，更多显示 `+N`。
 - 模型 payload 不含 URL、来源 metadata、日期、项目指标或 Markdown。
+- 候选 title/text 含 URL 或 unsafe Markdown 时在 adapter 边界拒绝并记录 `candidate_rejections`；剩余候选仍须满足 `minimum_candidates`。
 - 不使用 Markdown 分隔线。
 
-## 生产运行策略
+## v0.3.0 运行策略
 
 - 来源级 `required`：必选 producer 失败时在模型调用前终止，绝不生成部分报告。
 - 报告级 `minimum_candidates`：固定板块候选低于下限时在模型调用前终止。

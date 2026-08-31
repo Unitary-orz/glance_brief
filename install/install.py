@@ -33,7 +33,6 @@ import hashlib
 import importlib.util
 import json
 import py_compile
-import re
 import shutil
 import sys
 from datetime import datetime
@@ -43,54 +42,128 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = Path(__file__).resolve().parent / "install-manifest.json"
 INSTALL_MANIFEST_NAME = "install-manifest.json"
 
-# Adapter entry points are thin wrappers: they resolve the runtime home and
-# config paths, then execute the matching library module with runpy.
-ENTRYPOINT_AGENTS_REPORT = """#!/usr/bin/env python3
-\"\"\"Hermes runtime entry point for the glance-brief agents report.\"\"\"
+# Report entry points are thin runtime adapters around the shared core.  Source
+# acquisition is configured through the core's bounded json_file/command_json
+# drivers; the wrappers never bypass resolver or deterministic rendering.
+REPORT_ENTRYPOINT_TEMPLATE = """#!/usr/bin/env python3
+\"\"\"Installed strict report entry point for glance_brief.\"\"\"
 from __future__ import annotations
 
+import argparse
 import os
-import runpy
+import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+REPORT_ID = "__REPORT_ID__"
 HERE = Path(__file__).resolve().parent
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HERE.parents[1]))).expanduser()
-MODULE_DIR = HERE / "lib" / "agents-report"
 DATA_DIR = HERMES_HOME / "data" / "glance-brief"
+LIB_DIR = HERE / "lib"
+sys.path.insert(0, str(LIB_DIR))
 
-os.environ.setdefault("AGENTS_RADAR_QUALITY_MODULE_DIR", str(MODULE_DIR))
-os.environ.setdefault("AGENTS_RADAR_COLLECTOR", str(MODULE_DIR / "agents-radar-daily.py"))
-os.environ.setdefault("AGENTS_RADAR_OUTPUT_DIR", str(DATA_DIR / "output" / "agents-radar"))
-os.environ.setdefault("AGENTS_RADAR_QUALITY_CONFIG", str(DATA_DIR / "config" / "agents_radar_quality.json"))
-os.environ.setdefault("CODEXRADAR_CONFIG", str(DATA_DIR / "config" / "codexradar_watch.json"))
-sys.path.insert(0, str(MODULE_DIR))
-runpy.run_path(str(MODULE_DIR / "agents_radar_prefetch.py"), run_name="__main__")
+from glance_brief.cli import run_pipeline
+
+config = Path(
+    os.environ.get("GLANCE_BRIEF_CONFIG", str(DATA_DIR / "config" / "brief.json"))
+).expanduser()
+if not config.is_file():
+    print(
+        f"glance_brief configuration missing: {config}; copy and customize brief.example.json",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+output_override = os.environ.get("GLANCE_BRIEF_OUTPUT_DIR")
+if output_override:
+    output = Path(output_override).expanduser()
+else:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    output = DATA_DIR / "output" / REPORT_ID / stamp
+
+model_path_value = os.environ.get("GLANCE_BRIEF_MODEL_RESPONSE")
+model_response = Path(model_path_value).expanduser() if model_path_value else None
+
+
+def invoke_model(prompt: str):
+    executable = os.environ.get("GLANCE_BRIEF_HERMES", "hermes")
+    model = os.environ.get("GLANCE_BRIEF_MODEL")
+    provider = os.environ.get("GLANCE_BRIEF_PROVIDER")
+    reasoning = os.environ.get("GLANCE_BRIEF_REASONING")
+    timeout = float(os.environ.get("GLANCE_BRIEF_TIMEOUT", "600"))
+    argv = [
+        executable, "chat", "-q", prompt,
+        "--toolsets", "safe",
+        "--ignore-rules",
+        "--source", "tool",
+        "--max-turns", "1",
+        "--quiet",
+    ]
+    if model:
+        argv.extend(["--model", model])
+    if provider:
+        argv.extend(["--provider", provider])
+    if reasoning:
+        argv.extend(["--reasoning", reasoning])
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            check=False,
+            shell=False,
+            env=os.environ.copy(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"Hermes model call timed out after {timeout:g}s") from exc
+    except OSError as exc:
+        raise RuntimeError(f"could not start Hermes model adapter: {exc}") from exc
+    usage = {
+        "mode": "hermes-runtime-adapter",
+        "model": model,
+        "provider": provider,
+        "reasoning": reasoning,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "returncode": completed.returncode,
+    }
+    if completed.returncode:
+        detail = (completed.stderr or completed.stdout).strip()
+        raise RuntimeError(f"Hermes model adapter exited with {completed.returncode}: {detail}")
+    return completed.stdout, usage
+
+
+args = argparse.Namespace(
+    config=config,
+    report=REPORT_ID,
+    output_dir=output,
+    model_response=model_response,
+    date=os.environ.get("GLANCE_BRIEF_DATE"),
+)
+try:
+    report_path = run_pipeline(
+        args,
+        model_runner=None if model_response is not None else invoke_model,
+    )
+except Exception as exc:
+    print(f"glance_brief Hermes runtime error: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+sys.stdout.write(report_path.read_text(encoding="utf-8"))
 """
 
-ENTRYPOINT_NOON_NEWS = """#!/usr/bin/env python3
-\"\"\"Hermes runtime entry point for the glance-brief noon news report.\"\"\"
-from __future__ import annotations
 
-import os
-import runpy
-from pathlib import Path
+def report_entrypoint(report_id: str) -> str:
+    return REPORT_ENTRYPOINT_TEMPLATE.replace("__REPORT_ID__", report_id)
 
-HERE = Path(__file__).resolve().parent
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HERE.parents[1]))).expanduser()
-MODULE_DIR = HERE / "lib" / "noon-news"
-SKILLS_DIR = HERMES_HOME / "skills"
 
-os.environ.setdefault(
-    "NEWS_AGGREGATOR_SCRIPT",
-    str(SKILLS_DIR / "news-aggregator-skill" / "scripts" / "fetch_news.py"),
-)
-os.environ.setdefault(
-    "NEWS_SUMMARY_SCRIPT",
-    str(SKILLS_DIR / "news-summary" / "scripts" / "fetch_rss.py"),
-)
-runpy.run_path(str(MODULE_DIR / "noon_news_prefetch.py"), run_name="__main__")
-"""
+ENTRYPOINT_AGENTS_REPORT = report_entrypoint("agents-report")
+ENTRYPOINT_NOON_NEWS = report_entrypoint("noon-news")
 
 ENTRYPOINT_QUALITY_CHECK = """#!/usr/bin/env python3
 \"\"\"Quality-check entry point for the installed glance-brief agents report.\"\"\"
@@ -129,7 +202,24 @@ os.environ.setdefault("CODEXRADAR_CONFIG", str(DATA_DIR / "config" / "codexradar
 runpy.run_path(str(MODULE_DIR / "codexradar_efficiency.py"), run_name="__main__")
 """
 
+ENTRYPOINT_GLANCE_BRIEF = """#!/usr/bin/env python3
+\"\"\"Installed command-line entry point for glance_brief.\"\"\"
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+LIB_DIR = HERE / "lib"
+sys.path.insert(0, str(LIB_DIR))
+
+from glance_brief.cli import main
+
+raise SystemExit(main())
+"""
+
 ENTRYPOINTS = {
+    "glance-brief.py": ENTRYPOINT_GLANCE_BRIEF,
     "agents-report.py": ENTRYPOINT_AGENTS_REPORT,
     "noon-news.py": ENTRYPOINT_NOON_NEWS,
     "agents-quality-check.py": ENTRYPOINT_QUALITY_CHECK,
@@ -143,6 +233,25 @@ def sha256(path: Path) -> str:
 
 def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def check_runtime_config(path: Path, components: list[str]) -> tuple[bool, str]:
+    """Validate the minimum installer/runtime boundary without importing the core."""
+    if not path.is_file():
+        return False, f"missing {path}; create it from brief.example.json"
+    try:
+        config = load_json(path)
+    except (OSError, ValueError) as exc:
+        return False, f"invalid {path}: {exc}"
+    reports = config.get("reports")
+    valid = (
+        config.get("schema_version") == 2
+        and isinstance(reports, dict)
+        and all(component in reports for component in components)
+    )
+    if not valid:
+        return False, "must be schema 2 and configure every installed report"
+    return True, str(path)
 
 
 def hermes_home(prefix: str | None) -> Path:
@@ -173,6 +282,19 @@ def check_external_skills(skills: dict, home: Path) -> list[dict]:
     return missing
 
 
+def plan_core_copy(manifest: dict) -> list[tuple[Path, Path]]:
+    spec = manifest["core"]
+    src_dir = REPO_ROOT / spec["source"]
+    if not src_dir.is_dir():
+        raise SystemExit(f"ERROR: core source missing: {src_dir}")
+    destination = Path(spec["destination"])
+    pairs = []
+    for source in sorted(src_dir.rglob("*")):
+        if source.is_file() and "__pycache__" not in source.parts:
+            pairs.append((source, destination / source.relative_to(src_dir)))
+    return pairs
+
+
 def plan_lib_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Path]]:
     pairs = []
     for comp in components:
@@ -186,11 +308,12 @@ def plan_lib_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Pat
 
 
 def render_entrypoints(manifest: dict, components: list[str]) -> list[tuple[str, str]]:
-    files = []
+    files = [(manifest["core"]["entrypoint"], ENTRYPOINTS[manifest["core"]["entrypoint"]])]
     for comp in components:
         files.append((manifest["components"][comp]["entrypoint"], ENTRYPOINTS[manifest["components"][comp]["entrypoint"]]))
     for name, spec in manifest["utility_entrypoints"].items():
-        files.append((name, ENTRYPOINTS[name]))
+        if spec["lib_component"] in components:
+            files.append((name, ENTRYPOINTS[name]))
     return files
 
 
@@ -207,8 +330,9 @@ def cmd_install(args) -> int:
         raise SystemExit(f"ERROR: unknown components: {', '.join(unknown)}")
 
     plan = {"scripts_dir": str(scripts_root), "data_dir": str(data_root)}
-    changes = {"lib_files": [], "entrypoints": [], "config_files": [], "dirs": []}
+    changes = {"core_files": [], "lib_files": [], "entrypoints": [], "config_files": [], "dirs": []}
 
+    core_pairs = plan_core_copy(manifest)
     lib_pairs = plan_lib_copy(manifest, components)
     entry_files = render_entrypoints(manifest, components)
 
@@ -216,7 +340,9 @@ def cmd_install(args) -> int:
     for sub in ("config", "state", "cache", "output"):
         changes["dirs"].append(str(data_root / sub))
 
-    # lib files (always updated on re-install)
+    # shared core and component libraries (always updated on re-install)
+    for src, rel in core_pairs:
+        changes["core_files"].append(str(scripts_root / rel))
     for src, rel in lib_pairs:
         changes["lib_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
 
@@ -225,6 +351,13 @@ def cmd_install(args) -> int:
         changes["entrypoints"].append(str(scripts_root / name))
 
     # default configs (only when target missing)
+    core_config = manifest["core"]
+    core_config_dst = data_root / "config" / core_config["config_target"]
+    if not core_config_dst.exists():
+        changes["config_files"].append({
+            "template": core_config["config_template"],
+            "dst": str(core_config_dst),
+        })
     for comp in components:
         for target, template_rel in manifest["components"][comp].get("config_templates", {}).items():
             dst = data_root / "config" / target
@@ -232,7 +365,14 @@ def cmd_install(args) -> int:
                 changes["config_files"].append({"template": template_rel, "dst": str(dst)})
 
     if args.dry_run:
-        print(json.dumps({"action": "install", "dry_run": True, "plan": plan, "changes": changes}, ensure_ascii=False, indent=2))
+        print(json.dumps({
+            "action": "install",
+            "dry_run": True,
+            "project_version": manifest["project_version"],
+            "components": components,
+            "plan": plan,
+            "changes": changes,
+        }, ensure_ascii=False, indent=2))
         return 0
 
     scripts_root.mkdir(parents=True, exist_ok=True)
@@ -240,7 +380,7 @@ def cmd_install(args) -> int:
     for d in changes["dirs"]:
         Path(d).mkdir(parents=True, exist_ok=True)
 
-    for src, rel in lib_pairs:
+    for src, rel in core_pairs + lib_pairs:
         dst = scripts_root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
@@ -256,35 +396,41 @@ def cmd_install(args) -> int:
     skill_missing = check_external_skills(manifest.get("external_skills", {}), home)
 
     owned = []
-    for src, rel in lib_pairs:
-        owned.append({"path": str(Path("lib") / rel.parent.name / rel.name), "sha256": sha256(src)})
+    for src, rel in core_pairs + lib_pairs:
+        owned.append({"path": str(rel), "sha256": sha256(src)})
     for name, _content in entry_files:
         dst = scripts_root / name
         owned.append({"path": name, "sha256": sha256(dst)})
 
     installed = {
-        "schema_version": 1,
+        "schema_version": 2,
         "project": manifest["project"],
+        "project_version": manifest["project_version"],
         "runtime": args.runtime,
         "components": components,
         "scripts_dir": rt["scripts_dir"],
         "data_dir": rt["data_dir"],
+        "core_entrypoint": manifest["core"]["entrypoint"],
         "entrypoints": {comp: manifest["components"][comp]["entrypoint"] for comp in components},
         "jobs": {
             comp: {
                 "name": comp,
                 "script": f"{Path(rt['scripts_dir']).name}/{manifest['components'][comp]['entrypoint']}",
-                "prompt": manifest["components"][comp]["prompt"],
+                "no_agent": True,
                 "default_schedule": manifest["components"][comp]["default_schedule"],
             }
             for comp in components
         },
         "owned_files": owned,
         "user_config_files": [
-            f"config/{name}"
-            for comp in components
-            for name in manifest["components"][comp].get("config_templates", {})
+            f"config/{manifest['core']['config_target']}",
+            *[
+                f"config/{name}"
+                for comp in components
+                for name in manifest["components"][comp].get("config_templates", {})
+            ],
         ],
+        "runtime_config_file": f"config/{manifest['core']['runtime_config_target']}",
     }
     manifest_dst = data_root / INSTALL_MANIFEST_NAME
     manifest_dst.write_text(json.dumps(installed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -293,10 +439,18 @@ def cmd_install(args) -> int:
         "action": "install",
         "ok": True,
         "runtime": args.runtime,
+        "project_version": manifest["project_version"],
         "components": components,
         "installed_manifest": str(manifest_dst),
         "missing_python_deps": dep_missing,
         "missing_external_skills": skill_missing,
+        "required_setup": [
+            {
+                "action": "create_runtime_config",
+                "template": str(data_root / "config" / manifest["core"]["config_target"]),
+                "target": str(data_root / installed["runtime_config_file"]),
+            }
+        ],
         "jobs_to_create": list(installed["jobs"].values()),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -324,8 +478,18 @@ def cmd_verify(args) -> int:
         installed = None
         add("installed-manifest", False, "not installed; run install first")
 
-    # entrypoints
-    for name in ENTRYPOINTS:
+    # only entry points owned by this installed component set
+    if installed:
+        expected_entrypoints = sorted(
+            {
+                item["path"]
+                for item in installed.get("owned_files", [])
+                if isinstance(item.get("path"), str) and not item["path"].startswith("lib/")
+            }
+        )
+    else:
+        expected_entrypoints = [manifest["core"]["entrypoint"]]
+    for name in expected_entrypoints:
         p = scripts_root / name
         add(f"entrypoint:{name}", p.exists() and p.is_file(), str(p))
 
@@ -344,11 +508,20 @@ def cmd_verify(args) -> int:
             else:
                 add(f"entrypoint:{owned['path']}", True, "present")
 
-    # config files exist
+    # installed templates plus the user-authored runtime config
     if installed:
         for rel in installed.get("user_config_files", []):
             p = data_root / rel
             add(f"config:{rel}", p.exists(), str(p))
+        runtime_rel = installed.get("runtime_config_file")
+        if not isinstance(runtime_rel, str) or not runtime_rel:
+            add("runtime-config", False, "installed manifest does not declare runtime_config_file")
+        else:
+            valid, detail = check_runtime_config(
+                data_root / runtime_rel,
+                installed.get("components", []),
+            )
+            add("runtime-config", valid, detail)
 
     # cron wiring: a job whose script resolves to our entrypoints.
     # Hermes job `script` is relative to $HERMES_HOME/scripts/.
@@ -448,6 +621,16 @@ def cmd_doctor(args) -> int:
                 except (OSError, ValueError) as exc:
                     emit(group, f"config:{cfg_name}", "error", f"invalid JSON: {exc}")
 
+        runtime_rel = installed.get("runtime_config_file")
+        if not isinstance(runtime_rel, str) or not runtime_rel:
+            emit("runtime", "runtime-config", "error", "installed manifest does not declare runtime_config_file")
+        else:
+            valid, detail = check_runtime_config(
+                data_root / runtime_rel,
+                installed.get("components", []),
+            )
+            emit("runtime", "runtime-config", "ok" if valid else "error", detail)
+
     # dependencies and external skills (shared, hints)
     for dep in manifest.get("python_deps", []):
         pkg = dep.split(">=")[0].split("==")[0].strip()
@@ -489,31 +672,26 @@ def cmd_doctor(args) -> int:
                 emit("runtime", f"deliver:{jid}", "warn",
                      "delivery target not configured; ask the user which platform and target to deliver to "
                      "(e.g. feishu:<chat_id>, telegram:<chat_id>, or origin) and set the job deliver field")
-            if not (job.get("model") or ""):
-                emit("runtime", f"model:{jid}", "warn", "model not set (runtime default applies)")
     else:
         emit("runtime", "cron-wiring", "warn", "no jobs wired to glance-brief entry points")
 
-    out_dir = data_root / "output" / "agents-radar"
-    if out_dir.is_dir():
-        files = sorted(out_dir.glob("agents-radar-*.txt"), key=lambda p: p.stat().st_mtime)
-        if files:
+    if installed:
+        now = datetime.now().astimezone().timestamp()
+        for comp in installed.get("components", []):
+            out_dir = data_root / "output" / comp
+            files = sorted(out_dir.glob("*/report.md"), key=lambda p: p.stat().st_mtime) if out_dir.is_dir() else []
+            if not files:
+                emit("runtime", f"latest-output:{comp}", "warn", f"no verified report under {out_dir}")
+                continue
             latest = files[-1]
-            try:
-                match = re.search(r"(\d{4}-\d{2}-\d{2})", latest.name)
-                latest_date = datetime.strptime(match.group(1), "%Y-%m-%d").date() if match else None
-                today = datetime.now().astimezone().date()
-                age_days = (today - latest_date).days if latest_date else -1
-            except ValueError:
-                latest_date, age_days = None, -1
-            detail = f"{latest.name} (age={age_days}d)" if age_days >= 0 else latest.name
-            emit("runtime", "latest-output",
-                 "ok" if age_days is not None and 0 <= age_days <= 1 else "warn",
-                 detail + ("; check whether this morning's job ran" if not (age_days is not None and 0 <= age_days <= 1) else ""))
-        else:
-            emit("runtime", "latest-output", "warn", "no output files under output/agents-radar yet")
-    else:
-        emit("runtime", "latest-output", "warn", f"output dir missing: {out_dir}")
+            age_hours = max(0.0, (now - latest.stat().st_mtime) / 3600)
+            fresh = age_hours <= 36
+            emit(
+                "runtime",
+                f"latest-output:{comp}",
+                "ok" if fresh else "warn",
+                f"{latest} (age={age_hours:.1f}h)" + ("; check the scheduled job" if not fresh else ""),
+            )
 
     result = {
         "action": "doctor",
@@ -620,6 +798,11 @@ def main() -> int:
 
     args = parser.parse_args()
     if args.action == "install":
+        args.components = [
+            component.strip()
+            for component in args.components.split(",")
+            if component.strip()
+        ]
         return cmd_install(args)
     if args.action == "verify":
         return cmd_verify(args)

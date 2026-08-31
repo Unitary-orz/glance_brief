@@ -1,4 +1,4 @@
-"""Resolve lean model selections against the immutable V2 candidate registry."""
+"""Resolve lean model selections against the immutable candidate registry."""
 from __future__ import annotations
 
 import copy

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from v2 import adapters, contracts, render_report, resolve
+from glance_brief import adapters, contracts, render_report, resolve
 
 
 class NoonCurrentContractTests(unittest.TestCase):
@@ -533,7 +533,7 @@ class AgentsCurrentContractTests(unittest.TestCase):
 
 class PromptContractTests(unittest.TestCase):
     def test_noon_prompt_is_singular_candidate_semantic_json_only(self):
-        prompt = (ROOT / "v2" / "prompts" / "noon-news.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "glance_brief" / "prompts" / "noon-news.md").read_text(encoding="utf-8")
         for marker in ("只输出一个 JSON 对象", '"candidate_id"', '"summary"', '"headline_zh"'):
             self.assertIn(marker, prompt)
         for forbidden in ("candidate_ids", "item_refs", "Markdown 链接", "自行生成 URL"):
@@ -549,7 +549,7 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("max", prompt)
 
     def test_agents_prompt_excludes_program_owned_facts_and_requires_two_trends(self):
-        prompt = (ROOT / "v2" / "prompts" / "agents-report.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "glance_brief" / "prompts" / "agents-report.md").read_text(encoding="utf-8")
         for marker in ("只输出一个 JSON 对象", '"ai_ecosystem"', '"open_source_trends"', "必须恰好两条"):
             self.assertIn(marker, prompt)
         for marker in ("不得输出项目名", "不得输出 URL", "不得输出 Star", "不得输出 CodexRadar"):

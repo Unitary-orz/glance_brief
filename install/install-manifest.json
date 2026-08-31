@@ -1,7 +1,16 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "glance_brief",
+  "project_version": "0.3.0",
   "python_deps": ["feedparser>=6.0,<7"],
+  "core": {
+    "source": "glance_brief",
+    "destination": "lib/glance_brief",
+    "entrypoint": "glance-brief.py",
+    "config_template": "config/brief.example.json",
+    "config_target": "brief.example.json",
+    "runtime_config_target": "brief.json"
+  },
   "external_skills": {
     "news-aggregator-skill": {
       "expected_script": "scripts/fetch_news.py",
@@ -16,7 +25,7 @@
     "agents-report": {
       "description": "AI / Agents ecosystem daily report",
       "lib_source": "skills/agents-report/scripts",
-      "prompt": "skills/agents-report/prompts/agents-report-v2.md",
+      "prompt": "skills/agents-report/prompts/agents-report.md",
       "entrypoint": "agents-report.py",
       "default_schedule": "0 2 * * *",
       "config_templates": {
@@ -27,7 +36,7 @@
     "noon-news": {
       "description": "Midday news briefing",
       "lib_source": "skills/noon-news/scripts",
-      "prompt": "skills/noon-news/prompts/news-brief-v2.md",
+      "prompt": "skills/noon-news/prompts/news-brief.md",
       "entrypoint": "noon-news.py",
       "default_schedule": "30 4 * * *",
       "config_templates": {}

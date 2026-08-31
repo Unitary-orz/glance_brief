@@ -1,23 +1,21 @@
 {
-  "version": 1,
+  "version": 2,
   "runtime": "hermes",
   "template": true,
-  "note": "Template for creating Hermes jobs. After running install/install.py, the job `script` must be the relative path under $HERMES_HOME/scripts/ (e.g. glance-brief/agents-report.py), NOT a repository path. Fill in model and deliver; do not commit real chat ids.",
+  "note": "Run install/install.py first. Each script is relative to $HERMES_HOME/scripts/. no_agent disables only the outer scheduler agent; the installed Hermes runtime adapter performs one model call, then the shared core validates and renders the report. Configure model/provider through GLANCE_BRIEF_MODEL and GLANCE_BRIEF_PROVIDER if runtime defaults are not suitable. Do not commit real delivery identifiers.",
   "jobs": [
     {
       "name": "agents-report daily",
       "schedule_utc": "0 2 * * *",
       "script": "glance-brief/agents-report.py",
-      "prompt_file": "skills/agents-report/prompts/agents-report-v2.md",
-      "model": "<model>",
+      "no_agent": true,
       "deliver": "<platform>:<chat_id>"
     },
     {
       "name": "noon-news",
       "schedule_utc": "30 4 * * *",
       "script": "glance-brief/noon-news.py",
-      "prompt_file": "skills/noon-news/prompts/news-brief-v2.md",
-      "model": "<model>",
+      "no_agent": true,
       "deliver": "<platform>:<chat_id>"
     }
   ]

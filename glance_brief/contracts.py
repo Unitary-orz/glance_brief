@@ -1,6 +1,6 @@
-"""Single current schema and safety validators for Brief V2.
+"""Current schema and safety validators for glance_brief v0.3.0.
 
-The module intentionally knows only the current V2 contracts.  Historical
+The module intentionally knows only the current contracts. Historical
 protocol names and presentation-derived shapes are not accepted here.
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ LEGACY_KEYS = frozenset(
 
 
 class ContractError(ValueError):
-    """Raised when a current V2 object cannot be validated."""
+    """Raised when a current v0.3.0 object cannot be validated."""
 
 
 def _require_mapping(value: Any, path: str) -> Mapping[str, Any]:

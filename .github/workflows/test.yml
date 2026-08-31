@@ -8,24 +8,53 @@ permissions:
   contents: read
 
 jobs:
-  unit:
+  release-gates:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.10', '3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Compile Python scripts
-        run: python -m py_compile skills/agents-report/scripts/*.py skills/noon-news/scripts/*.py tests/test_scripts.py
-      - name: Run offline tests
-        run: python -m unittest discover -s tests -p 'test_*.py'
-      - name: Check JSON examples
+
+      - name: Install test-only dependency
+        run: python -m pip install 'feedparser>=6.0,<7'
+
+      - name: Run complete offline test suite
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Run static release gate
+        run: python tests/release_gate.py
+
+      - name: Validate formal example config
+        run: python -m glance_brief check --config config/brief.example.json
+
+      - name: Verify installer dry-run for both reports
         run: |
-          python -m json.tool adapters/hermes/jobs.example.json >/dev/null
-          python -m json.tool adapters/openclaw/jobs.example.json >/dev/null
-          python -m json.tool skills/agents-report/config/codexradar_watch.example.json >/dev/null
+          prefix="$(mktemp -d)"
+          python install/install.py install \
+            --runtime hermes \
+            --components agents-report,noon-news \
+            --prefix "$prefix" \
+            --dry-run
+          test ! -e "$prefix/scripts/glance-brief"
+          test ! -e "$prefix/data/glance-brief"
+
+      - name: Build and install wheel
+        run: |
+          rm -rf /tmp/glance-brief-wheels /tmp/glance-brief-package-env
+          python -m pip wheel --no-deps --wheel-dir /tmp/glance-brief-wheels .
+          python -m venv /tmp/glance-brief-package-env
+          /tmp/glance-brief-package-env/bin/python -m pip install \
+            --no-index --find-links /tmp/glance-brief-wheels glance-brief
+          /tmp/glance-brief-package-env/bin/glance-brief --help
+          /tmp/glance-brief-package-env/bin/python -m glance_brief --help
+          /tmp/glance-brief-package-env/bin/python -c \
+            "from importlib.resources import files; assert files('glance_brief').joinpath('prompts/agents-report.md').is_file(); assert files('glance_brief').joinpath('prompts/noon-news.md').is_file()"
+
       - name: Check whitespace
         run: git diff --check

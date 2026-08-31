@@ -1,129 +1,183 @@
-# glance_brief Agent Installation Contract
+# glance_brief v0.3.0 Agent Installation Contract
 
-This document is the contract for installing `glance_brief` into an Agent
-runtime (Hermes today; OpenClaw is a future adapter). It is written for an
-installing agent with terminal/file/job-control access, not for end users
-typing commands by hand. End users can hand this repository to their agent.
+This is the installation contract for an Agent with terminal, file, and scheduler
+access. `glance_brief v0.3.0` installs two reports on one shared strict pipeline:
 
-Installation must be **idempotent**: running it again updates project-owned
-files without duplicating jobs, resetting schedules, or overwriting user
-config. Uninstalling removes only what this project owns.
+- `agents-report` — AI / Agents ecosystem report;
+- `noon-news` — midday news briefing.
 
-## Scope
+The installer is idempotent and stdlib-only. It copies project-owned files,
+preserves user config/state/output, records hashes, and reports scheduler changes.
+It never creates, edits, or removes jobs directly.
 
-Two installable reports:
+## Supported runtime
 
-- `agents-report` — AI / Agents ecosystem daily report
-- `noon-news` — midday news briefing
+The verified runtime adapter in v0.3.0 is **Hermes**. OpenClaw currently has an
+adapter contract only and intentionally advertises no runnable jobs.
 
-Supported runtime: `hermes`. Files are placed under the runtime home
-(`$HERMES_HOME`, default `~/.hermes`):
+Hermes layout:
 
 ```text
-<hermes-home>/scripts/glance-brief/        entry points + lib/ (project-owned)
-<hermes-home>/data/glance-brief/           config, state, cache, output, manifest
+<hermes-home>/scripts/glance-brief/   shared core, report adapters, producer libraries
+<hermes-home>/data/glance-brief/      config, state, cache, output, install manifest
 ```
 
-## Discovery (before touching anything)
+## Architecture boundary
 
-1. Read `install/install-manifest.json`.
-2. Detect the runtime home: `$HERMES_HOME` or `~/.hermes`.
-3. Inspect existing installed files at
-   `<hermes-home>/data/glance-brief/install-manifest.json` and the Cron jobs
-   that reference `scripts/glance-brief/`.
-4. Check Python dependencies (`feedparser`) and external skills
-   (`news-aggregator-skill`, `news-summary`) — `install.py` reports them.
-5. Do not ask the user for facts discoverable locally.
+The shared `glance_brief` package is runtime-independent. It owns source
+assembly, model payload construction, response validation, resolution,
+deterministic rendering, artifacts, and replay. It never imports Hermes or
+selects a provider.
 
-## User decisions (ask only these)
+The installed Hermes report entry point owns one model invocation and returns raw
+JSON to the shared core. The scheduler job therefore uses `no_agent: true`: this
+disables the outer scheduler Agent, not the model call inside the batch process.
+It is not a zero-token mode.
 
-- Which components to install (`agents-report`, `noon-news`, or both).
-- Schedule and timezone for each report job (defaults are in the manifest).
-- Delivery target (platform and chat id).
-- Whether missing external skills may be installed, and from where.
-- Model/provider for the jobs, when not using the runtime default.
+## Discovery before changes
 
-Do not create or alter scheduled jobs or external delivery targets before the
-user approves the job preview.
+1. Read `install/install-manifest.json` and this document.
+2. Detect `$HERMES_HOME` or use `~/.hermes`.
+3. Inspect any installed manifest and jobs that reference
+   `glance-brief/*.py`; do not guess paths or job IDs.
+4. Check reported Python dependencies and external news skills.
+5. Ask the user only for decisions that cannot be discovered locally.
 
-## Install
+Required user decisions before job creation:
+
+- components to install;
+- schedule and timezone;
+- delivery platform and target;
+- whether optional missing dependencies/skills may be installed;
+- model/provider override only when the Hermes runtime default is unsuitable.
+
+Do not create or alter a job or delivery target before those values are approved.
+
+## 1. Dry-run and install
 
 ```bash
 python3 install/install.py install --runtime hermes \
-  [--components agents-report,noon-news] [--prefix <hermes-home>] [--dry-run]
+  [--components agents-report,noon-news] \
+  [--prefix <hermes-home>] \
+  [--dry-run]
 ```
 
-This copies the library modules and adapter entry points under
-`scripts/glance-brief/`, creates the data directories, seeds default config
-from `skills/*/config/*.example.json` (only when the target does not exist),
-and writes the installed manifest with file hashes.
+The command installs:
 
-`--dry-run` prints the exact plan without writing anything. JSON output is
-machine-readable for the agent; it includes:
+- `lib/glance_brief/` shared core and stable Prompt contracts;
+- selected component producer libraries;
+- `glance-brief.py` plus selected report/utility entry points;
+- `config/brief.example.json` and selected component config templates;
+- an installed manifest with project version and owned-file SHA-256 hashes.
 
-- `missing_python_deps`, `missing_external_skills` — warnings to resolve
-- `jobs_to_create` — suggested jobs: `script` (relative to
-  `<hermes-home>/scripts/`), `prompt`, `default_schedule`
+Reinstallation updates owned code but does not overwrite existing config files.
+The JSON result includes warnings, `required_setup`, and `jobs_to_create`.
 
-Create the jobs with the runtime's job interface (Hermes: `cronjob`), using
-the suggested values plus the user-approved schedule/delivery/model. Keep the
-job `script` as the relative path printed (`glance-brief/<entrypoint>.py`).
+## 2. Create the live schema 2 config
 
-## Verify
+The installer deliberately does not create live `brief.json`: the repository
+example points at offline fixtures and is not a production source configuration.
+Create and validate:
+
+```text
+<hermes-home>/data/glance-brief/config/brief.json
+```
+
+Use `brief.example.json` as a structural template, then replace fixture paths with
+real bounded `json_file` or argv-based `command_json` sources. The config must
+contain every installed report.
+
+Validate before creating jobs:
+
+```bash
+<hermes-home>/scripts/glance-brief/glance-brief.py check \
+  --config <hermes-home>/data/glance-brief/config/brief.json
+```
+
+Do not place credentials, shell strings, chat IDs, or delivery data in this file.
+`command_json` must remain an argv array with its explicit environment allowlist.
+
+## 3. Create approved Hermes jobs
+
+Use Hermes' native scheduler interface and the `jobs_to_create` suggestions.
+Report scripts are relative to `$HERMES_HOME/scripts/`:
+
+```text
+glance-brief/agents-report.py
+glance-brief/noon-news.py
+```
+
+Each report job must use:
+
+```json
+{"no_agent": true}
+```
+
+Do not attach `prompt`, `prompt_file`, `model`, `provider`, or `skills` to the
+script-only job. The installed Hermes adapter uses the runtime default model and
+provider. Optional overrides belong in the scheduler process environment:
+
+```text
+GLANCE_BRIEF_MODEL
+GLANCE_BRIEF_PROVIDER
+GLANCE_BRIEF_REASONING
+GLANCE_BRIEF_TIMEOUT
+```
+
+Set schedule and delivery only from the user-approved values. Never commit real
+job IDs, chat IDs, credentials, or user model configuration.
+
+## 4. Verify
+
+After writing `brief.json` and creating approved jobs:
 
 ```bash
 python3 install/install.py verify --runtime hermes [--prefix <hermes-home>]
 ```
 
-Exit code 0 means: installed manifest present, all entry points exist, every
-library file matches its recorded hash, default config files exist, and at
-least one Cron job is wired to a `glance-brief/` entry point. Report the
-failing checks to the user; a job whose prefetch output is stale is not a
-verify failure — the report is produced by the scheduled job itself.
+Exit code 0 requires:
 
-## Doctor (component completeness + hints)
+- installed manifest present;
+- only the selected components' entry points present;
+- all owned library hashes matching;
+- installed templates present;
+- live `brief.json` parseable as schema 2 and containing every selected report;
+- at least one installed report entry point wired to Hermes Cron.
+
+A missing live config is a hard failure because the installed report entry points
+cannot run without it.
+
+## 5. Doctor
 
 ```bash
 python3 install/install.py doctor --runtime hermes [--prefix <hermes-home>]
 ```
 
-Read-only check for an installing or updating agent. It reports each
-installed component (`agents-report`, `noon-news`) with its entry point,
-library hashes and config files, then shared dependencies (external news
-skills, Python deps) and runtime hints (Cron wiring, job last status,
-delivery target, model, latest output freshness). Every item has a status:
+`doctor` is read-only. It checks component completeness and reports optional
+runtime/dependency hints. It never fetches sources or sends messages:
 
 - `ok` — complete;
-- `warn` — optional hint only (missing external skill, stale output, job
-  error); the agent should tell the user, not fail;
-- `error` — installation is broken (entry point missing, hash drift, config
-  unparseable).
+- `warn` — optional dependency, unwired job, stale/error hint, or missing delivery;
+- `error` — broken owned file, unparseable required config, or missing entry point.
 
-Exit code is 1 only when an `error` is present. Doctor never fetches source
-data and never sends a message.
-
-## Uninstall
+## 6. Uninstall
 
 ```bash
 python3 install/install.py uninstall --runtime hermes \
   [--prefix <hermes-home>] [--dry-run]
 ```
 
-Removes only files listed in the installed manifest and reports
-`jobs_to_detach`. It preserves `<hermes-home>/data/glance-brief/` user
-config/state/output by default. After the dry-run is approved, remove the
-reported jobs with the runtime job interface, then run uninstall again to
-delete the files.
+The installer removes only files listed as project-owned and reports
+`jobs_to_detach`. Detach approved jobs through Hermes' native scheduler interface.
+User config, state, cache, and output are preserved by default.
 
-## Invariants (do not break)
+## Invariants
 
-- Never modify the committed prompt files (`skills/*/prompts/*-v2.md`) or the
-  report layout contract (`docs/output-contracts.md`) during installation.
-- Never change existing schedules, models, providers, delivery targets, or
-  credentials of unrelated jobs.
-- Never embed runtime paths, chat ids, job ids, or credentials into committed
-  files. Runtime paths belong in the adapter entry points written by
-  `install.py`.
-- Keep `schema_version: 1` in prefetch payloads and source failures as
-  `ok:false + error + items:[]`.
-- No third-party Python dependencies for the installer itself (stdlib only).
+- Never bypass resolver/validator/rendering by asking an outer Agent to write the
+  final report.
+- Never overwrite user config on reinstall.
+- Never modify unrelated jobs, schedules, delivery targets, or credentials.
+- Never commit runtime paths, real delivery IDs, generated reports, or secrets.
+- Invalid model output must leave failure artifacts and no `report.md`.
+- Installer operations must remain stdlib-only and scheduler writes must remain
+  outside `install.py`.

@@ -75,11 +75,12 @@ class NoonAIHOTV1Tests(unittest.TestCase):
             noon_prefetch.AIHOT_BASE,
             "https://aihot.virxact.com/api/v1/items",
         )
-        prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(
+        prompt = (ROOT / "skills/noon-news/prompts/news-brief.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("source.name", prompt)
-        self.assertIn("links.original", prompt)
+        self.assertNotIn("source.name", prompt)
+        self.assertNotIn("links.original", prompt)
+        self.assertIn("不得输出 URL、来源", prompt)
         self.assertNotIn("AIHOT_PUBLIC_BASE", prompt)
 
 

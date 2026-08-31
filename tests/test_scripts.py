@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import re
 import subprocess
 import sys
 import unittest
@@ -74,10 +73,22 @@ class AdapterTests(unittest.TestCase):
         for job in payload["jobs"]:
             # Job scripts are runtime paths relative to $HERMES_HOME/scripts/,
             # not repository paths; the entry point name must be declared in
-            # the install manifest.
+            # the install manifest. The entry point owns the model adapter and
+            # deterministic post-processing, so the scheduler must not start a
+            # second outer agent.
             self.assertRegex(job["script"], r"^glance-brief/[A-Za-z0-9._-]+\.py$", job["script"])
             self.assertIn(Path(job["script"]).name, entrypoints, job["script"])
-            self.assertTrue((ROOT / job["prompt_file"]).is_file(), job["prompt_file"])
+            self.assertIs(job.get("no_agent"), True, job)
+            for forbidden in ("prompt", "prompt_file", "model", "provider", "skills"):
+                self.assertNotIn(forbidden, job, job)
+
+    def test_openclaw_template_does_not_advertise_an_unimplemented_runtime_pipeline(self):
+        payload = json.loads(
+            (ROOT / "adapters/openclaw/jobs.example.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(payload["runtime"], "openclaw")
+        self.assertEqual(payload.get("status"), "adapter-contract-only")
+        self.assertEqual(payload.get("jobs"), [])
 
     def test_private_skill_configs_are_gitignored(self):
         for relative in (
@@ -363,46 +374,34 @@ class NoonNewsTests(unittest.TestCase):
         self.assertEqual(result["items"], [])
         self.assertIn("could not start", result["error"])
 
-    def test_prompt_keeps_source_on_separate_line(self):
-        prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
-        self.assertIn("> 来源：[NS•AlJazeera](原文链接)•[BBC](原文链接)", prompt)
-        self.assertIn("每条分类详情必须严格占用连续三行", prompt)
-        self.assertIn("禁止写成“标题：描述”或“标题（短题）：描述”", prompt)
-        self.assertIn("来源单独一行，用引用块（`> 来源：`）", prompt)
-        self.assertIn("正文不显示 URL 明文", prompt)
-        self.assertIn("冒号一律替换为 `•`", prompt)
-        self.assertIn("`公众号` 统一替换为 `WX`", prompt)
-        self.assertIn("最多 2 个渠道", prompt)
-        self.assertIn("+N", prompt)
-        self.assertIn("同渠道去重", prompt)
-        self.assertIn("链接使用脚本原始条目的 `link` 或 `url`", prompt)
-        self.assertIn("严格输出 4–5 条编号列表", prompt)
-        self.assertIn("主题词为 2–6 个中文字符", prompt)
-        self.assertIn("只有原始标题为英文时，才在英文标题后加中文对照翻译括号", prompt)
-        self.assertNotIn("中文短题", prompt)
-        self.assertIn("非英文原始标题没有括号翻译", prompt)
-        self.assertNotIn("事实描述。（来源", prompt)
-        self.assertNotIn("[NS](原文链接) · [BBC](原文链接)", prompt)
+    def test_noon_model_prompt_is_semantic_json_only(self):
+        prompt = (ROOT / "glance_brief/prompts/noon-news.md").read_text(encoding="utf-8")
+        self.assertIn("只输出一个 JSON 对象", prompt)
+        self.assertIn("每条详情只能选择一个 candidate_id", prompt)
+        self.assertIn("不得出现复数 ID 字段", prompt)
+        self.assertIn("不得输出 URL、来源、日期、Markdown", prompt)
+        self.assertNotIn("> 来源：", prompt)
 
 
 class OutputContractTests(unittest.TestCase):
-    def test_agents_prompt_has_current_sections_and_limits(self):
-        prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
-        for section in ("AI 生态动态", "CodexRadar 智力效率", "开源热点趋势"):
-            self.assertIn(section, prompt)
-        self.assertIn("不超过 140 字", prompt)
-        self.assertIn("热门项目", prompt)
-        self.assertIn("其他项目", prompt)
+    def test_agents_model_prompt_is_semantic_json_only(self):
+        prompt = (ROOT / "glance_brief/prompts/agents-report.md").read_text(encoding="utf-8")
+        self.assertIn("只输出一个 JSON 对象", prompt)
+        self.assertIn("ai_ecosystem", prompt)
+        self.assertIn("open_source_trends", prompt)
+        self.assertIn("不得输出 URL", prompt)
+        self.assertIn("不得输出 CodexRadar 内容", prompt)
+        self.assertNotIn("## 固定输出结构", prompt)
 
-    def test_agents_prompt_uses_available_sources_without_padding(self):
-        prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
-        self.assertIn("1–3 个真实相关来源", prompt)
-        self.assertIn("只有一个来源时直接使用一个", prompt)
-        self.assertNotIn("🌐 Agents生态趋势", prompt)
+    def test_agents_prompt_limits_selection_without_padding(self):
+        prompt = (ROOT / "glance_brief/prompts/agents-report.md").read_text(encoding="utf-8")
+        self.assertIn("选择 1–3 条重要动态", prompt)
+        self.assertIn("证据不足时可以少选", prompt)
+        self.assertIn("必须恰好两条", prompt)
 
     def test_noon_prompt_allows_only_source_supported_forecasts(self):
-        prompt = (ROOT / "skills/noon-news/prompts/news-brief-v2.md").read_text(encoding="utf-8")
-        self.assertIn("允许原始来源明确给出的预测、预警和条件判断", prompt)
+        prompt = (ROOT / "glance_brief/prompts/noon-news.md").read_text(encoding="utf-8")
+        self.assertIn("允许忠实概括原始候选明确给出的预测、预警和条件判断", prompt)
         self.assertIn("禁止模型自行推演", prompt)
 
     def test_quality_checker_rejects_preface_and_ignores_sentence_as_category(self):
@@ -554,11 +553,7 @@ All context confirmed.
             [warning["code"] for warning in checked["warnings"]],
         )
 
-    def test_codex_heading_is_not_a_duplicate_output_line(self):
-        prompt = (ROOT / "skills/agents-report/prompts/agents-report-v2.md").read_text(encoding="utf-8")
-        structure = prompt.split("## 固定输出结构", 1)[1].split("## AI 生态动态", 1)[0]
-        standalone_heading = re.compile(r"^\*\*🧠 CodexRadar 智力效率\*\*$", re.MULTILINE)
-        self.assertIsNone(standalone_heading.search(structure))
+    def test_codex_utility_emits_one_heading(self):
         self.assertEqual(
             codexradar.render_markdown([], [], [], []).count("**🧠 CodexRadar 智力效率**"),
             1,

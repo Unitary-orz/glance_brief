@@ -1,9 +1,11 @@
 # noon-news changelog
 
-## 0.3.0 — 2026-08-26
+## 0.3.0 — 2026-08-31
 
-- 新增独立 V2 语义协议、元数据恢复、稳定 Markdown 渲染和离线回归测试。
-- 英文原文标题后的中文部分统一称为“中文对照翻译”，同步 active Prompt 与输出契约。
+- 对外版本统一为 glance_brief v0.3.0，并接入项目级正式 `glance_brief` core。
+- 引入单候选语义协议、candidate registry、元数据恢复、selection limits 和 deterministic renderer。
+- 增加 unsafe candidate rejection、required、minimum candidates、manifest、replay 和 tamper rejection 门禁。
+- 英文原题后的中文部分统一称为“中文对照翻译”。
 
 ## 0.2.0 — 2026-08-10
 

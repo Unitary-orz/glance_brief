@@ -1,10 +1,12 @@
 # Changelog
 
-## 0.3.0 — 2026-08-26
+## 0.3.0 — 2026-08-31
 
-- 新增独立 V2 语义协议与渲染链路：模型只负责筛选、单候选摘要、中文对照翻译和全局要点，程序负责恢复元数据、校验引用并生成稳定 Markdown。
-- 增加 V2 的配置示例、离线 fixtures、运行入口、评估工具、迁移转换器和回归测试；生成的实验产物不进入提交。
-- 同步 noon-news 标题规则：英文原文标题后的中文部分使用“中文对照翻译”，并与事实描述保持分离。
+- 仓库、Skill 与公开文档统一为 glance_brief v0.3.0；共享 pipeline 晋升为顶层正式 `glance_brief` 包与统一 CLI，不保留实验目录或双发布线。
+- 引入 bounded adapters、immutable candidate registry、lean semantic payload、resolver、strict validator 与 deterministic renderer；模型只负责候选选择、单候选摘要、中文对照翻译和总体趋势。
+- 增加 required、minimum candidates、selection limits、unsafe candidate rejection、manifest、SHA-256 replay 与 tamper rejection 门禁。
+- 移除 legacy converter、legacy fixtures、legacy tests 和多协议运行分支；失败时保留诊断与 failed manifest，不生成 `report.md`。
+- 统一 noon-news 的英文标题中文对照规则，并保持原题、事实句与来源引用三行分离。
 
 ## 0.2.3 — 2026-08-25
 
@@ -19,7 +21,7 @@
 - 所有来源统一用 `•` 连接；同渠道去重（渠道只写一次，媒体 `•` 连接）。
 - 每条新闻最多 2 个渠道，来源渠道超过 2 个时只保留前 2 个并在行末加 `+N`。
 - 来源链接文字内冒号一律替换为 `•`（内容保留，如 `X：Boris Cherny` → `X•Boris Cherny`）；`公众号` 统一替换为 `WX`。
-- 同步更新 `news-brief-v2.md`、`docs/output-contracts.md`、`skills/noon-news/SKILL.md` 与契约测试。
+- 同步更新 `news-brief.md`、`docs/output-contracts.md`、`skills/noon-news/SKILL.md` 与契约测试。
 
 ## 0.2.1 — 2026-08-10
 
