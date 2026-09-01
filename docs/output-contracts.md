@@ -8,7 +8,7 @@
 📡 **agents-radar 生态报告 | YYYY-MM-DD**
 
 **🤖 AI 生态动态**
-- ① **短导语**：代表一个生态变化簇；可用分号并列同簇中的互补事实，保留主体、动作、结果和关键限定。（来源：[原文](精确 URL)•[独立分析](精确 URL，可选)）
+- ① 短导语：代表一个生态变化簇；可用分号并列同簇中的互补事实，保留主体、动作、结果和关键限定。（来源：[原文](精确 URL) · [独立分析](精确 URL，可选)）
 
 [逐字插入 producer-owned `codexradar.markdown`；该 block 自带标题]
 
@@ -19,19 +19,21 @@
 **✨新热门开源**
 - [owner/repo](精确 GitHub URL)「模型根据 producer description 翻译的中文简介」(+X★/日)
 
+📦**最热门开源**
+
 ① producer 分类标题
-- 热门项目：✨ [owner/repo](精确 GitHub URL)「模型根据 producer description 翻译的中文简介」(+X★/日)
+- ✨ [owner/repo](精确 GitHub URL)「模型根据 producer description 翻译的中文简介」(+X★/日) · [owner/repo](精确 GitHub URL)「模型根据 producer description 翻译的中文简介」(+X★/日)
 ```
 
 约束：
 
 - AI 动态不是单篇新闻排行榜，而是对当天生态变化的最多三条编辑切片；先按事件、进展或明确互补主题聚类，再选择摘要。候选池达到 5 条时，默认目标是覆盖至少 5 个候选 ID；仅在候选确实无关、重复或证据不足时少选，不得为了三条上限直接输出三条单候选动态。每条使用 1–3 个 `candidate_ids`，候选 ID 在全文不得复用；来源从所有绑定候选的 provenance 合并回填。
-- AI 动态每条都有 `topic` 短导语，renderer 以 `**topic**：summary` 输出；摘要目标 80–120 字、硬上限 140 字，并不得出现 RSS、feed、网页采集或抓取等来源管线细节。
-- AI 动态的 AIHOT 条目页只作为内部 provenance，不在可见来源行展示；可见来源只取原文或直接来源。同一发布方去重，社交平台短帖在有完整原文时降级；每条最多展示两个来源，使用 `•` 连接，不追加 `+N`。若没有可见原文，明确显示“暂无可见原文”，不得回退展示 AIHOT 条目页。
+- AI 动态每条都有 `topic` 短导语，renderer 以 `topic：summary` 输出（导语不加粗）；摘要目标 80–120 字、硬上限 140 字，并不得出现 RSS、feed、网页采集或抓取等来源管线细节。
+- AI 动态的 AIHOT 条目页只作为内部 provenance，不在可见来源行展示；可见来源只取原文或直接来源。同一发布方去重，社交平台短帖在有完整原文时降级；每条最多展示两个来源，使用 ` · ` 连接，不追加 `+N`。若没有可见原文，明确显示“暂无可见原文”，不得回退展示 AIHOT 条目页。
 - CodexRadar Markdown 只验证后原样插入，不解析、不重排、不重算。
 - 开源总体趋势必须恰好两条，不得出现项目名、组织名、模型名、URL、Star 或其他数值。
-- `fresh_hot` 必须是 `hot_today` 的唯一子集；非空时只生成一次 `**✨新热门开源**`。
-- `local_report_categories` 必须唯一、完整覆盖 `hot_today`；分类标题逐字保留、顺序不变，每类只展示映射的第一项。
+- `fresh_hot` 必须是 `hot_today` 的唯一子集；非空时先生成一次 `**✨新热门开源**` 及其项目行，再生成 `📦**最热门开源**`，该行必须紧接分类标题之前。
+- `local_report_categories` 必须唯一、完整覆盖 `hot_today`；分类标题逐字保留、顺序不变，每类展示原始顺序前 1–3 项；同一分类的项目必须压缩到同一条列表行，用 ` · ` 连接。项目行直接从 Markdown 链接开始，不添加 `热门项目：`、`最热：` 或 `其他：` 前缀。
 - 项目名、URL、`stars_today`、`is_fresh_hot` 和分类全部来自 producer，不猜测或拼接；简介由模型只根据 producer description 翻译，resolver 要求每个实际展示项目恰好有一条中文简介。
 - `new_projects` 属于独立雷达，本报告不展示。
 - 不生成 `其他项目`，不使用 Markdown 分隔线。

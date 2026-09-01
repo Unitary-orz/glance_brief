@@ -99,7 +99,7 @@ class ResolvedSchemaContractTests(unittest.TestCase):
 
     def test_legacy_protocol_and_fourth_section_are_rejected(self):
         for broken in (
-            {**self._noon(), "semantic_protocol": "glance_brief.noon-news.v2"},
+            {**self._noon(), "semantic_protocol": "glance_brief.noon-news.preview"},
             {
                 **self._noon(),
                 "sections": {
@@ -456,6 +456,7 @@ class AgentsCurrentContractTests(unittest.TestCase):
             "open_source_descriptions": [
                 {"candidate_id": "cbbbbbbbbbbbbbbbb", "description_zh": "用于构建紧凑型智能体运行时。"},
                 {"candidate_id": "cccccccccccccccc", "description_zh": "用于本地 AI 系统的实用评测工具包。"},
+                {"candidate_id": "cdddddddddddddddd", "description_zh": "用于本地模型的实用工具。"},
             ],
             "harmless_debug": "ignored",
         }
@@ -469,9 +470,12 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["url"], "https://github.com/acme/alpha")
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["description"], "用于构建紧凑型智能体运行时。")
         self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["title"], "Agent 工具")
-        self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["project"]["name"], "acme/alpha")
-        self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["project"]["description"], "用于构建紧凑型智能体运行时。")
-        self.assertEqual(resolved["sections"]["open_source"]["categories"][1]["project"]["description"], "用于本地 AI 系统的实用评测工具包。")
+        self.assertEqual([project["name"] for project in resolved["sections"]["open_source"]["categories"][0]["projects"]], ["acme/alpha"])
+        self.assertEqual(
+            [project["name"] for project in resolved["sections"]["open_source"]["categories"][1]["projects"]],
+            ["acme/beta", "acme/gamma"],
+        )
+        self.assertEqual(resolved["sections"]["open_source"]["categories"][1]["projects"][1]["description"], "用于本地模型的实用工具。")
         self.assertEqual(resolved["sections"]["open_source"]["trends"], [item["summary"] for item in self._model()["open_source_trends"]])
         self.assertEqual(warnings, [])
         contracts.validate_resolved(resolved)
@@ -481,11 +485,20 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertLess(markdown.index("**🧠 CodexRadar 智力效率**"), markdown.index("**🔥 开源热点趋势**"))
         self.assertIn(assembled["metadata"]["codexradar"]["markdown"], markdown)
         self.assertIn("**✨新热门开源**", markdown)
-        self.assertIn("- ① **生态协作**：AI 生态出现新的协作信号。", markdown)
+        self.assertIn("- ① 生态协作：AI 生态出现新的协作信号。", markdown)
         self.assertIn("- ① 开源工具继续向更轻量的工作流整合。", markdown)
         self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
+        self.assertLess(markdown.index("**✨新热门开源**"), markdown.index("📦**最热门开源**"))
+        self.assertLess(markdown.index("📦**最热门开源**"), markdown.index("① Agent 工具"))
         self.assertIn("① Agent 工具", markdown)
-        self.assertIn("- 热门项目：✨ [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
+        self.assertIn("- ✨ [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
+        self.assertIn(
+            "- [acme/beta](https://github.com/acme/beta)「用于本地 AI 系统的实用评测工具包。」(+17★/日) · "
+            "[acme/gamma](https://github.com/acme/gamma)「用于本地模型的实用工具。」(+9★/日)",
+            markdown,
+        )
+        self.assertNotIn("\n- [acme/gamma]", markdown)
+        self.assertNotIn("热门项目：", markdown)
         self.assertNotIn("其他项目", markdown)
         self.assertNotIn("\n---\n", markdown)
 
@@ -511,10 +524,10 @@ class AgentsCurrentContractTests(unittest.TestCase):
 
         hidden = self._model()
         hidden["open_source_descriptions"].append({
-            "candidate_id": "cdddddddddddddddd",
-            "description_zh": "用于本地模型的工具。",
+            "candidate_id": "caaaaaaaaaaaaaaaa",
+            "description_zh": "用于 AI 生态的工具。",
         })
-        cases.append((hidden, "not a displayed project"))
+        cases.append((hidden, "candidate_id is unknown"))
 
         english = self._model()
         english["open_source_descriptions"][0]["description_zh"] = "A compact agent runtime."
@@ -693,6 +706,7 @@ class AgentsMultiCandidateContractTests(unittest.TestCase):
             "open_source_descriptions": [
                 {"candidate_id": "caaaaaaaaaaaaaaaa", "description_zh": "用于构建紧凑型智能体运行时。"},
                 {"candidate_id": "cbbbbbbbbbbbbbbbb", "description_zh": "用于本地 AI 系统的实用评测工具包。"},
+                {"candidate_id": "cccccccccccccccc", "description_zh": "用于本地模型的实用工具。"},
             ],
         }
 
@@ -726,7 +740,7 @@ class AgentsMultiCandidateContractTests(unittest.TestCase):
         self.assertEqual(len(item["provenance"][0]["links"]), 4)
 
         markdown = render_report.render_report(resolved)
-        self.assertIn("- ① **AI 安全与对齐**：两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。", markdown)
+        self.assertIn("- ① AI 安全与对齐：两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。", markdown)
         self.assertNotIn("https://aihot.test/", markdown)
         source_line = next(line for line in markdown.splitlines() if "（来源：" in line)
         self.assertLessEqual(source_line.count("]("), 2)
@@ -771,7 +785,7 @@ class AgentsMultiCandidateContractTests(unittest.TestCase):
 
         self.assertEqual(
             rendered,
-            "[Anthropic](https://anthropic.com/news/1)•[Gary Marcus](https://garymarcus.test/article)",
+            "[Anthropic](https://anthropic.com/news/1) · [Gary Marcus](https://garymarcus.test/article)",
         )
 
     def test_multi_candidate_summary_cannot_reuse_candidate_across_items(self):

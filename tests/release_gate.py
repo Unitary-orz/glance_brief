@@ -61,7 +61,7 @@ def main() -> int:
     if f'__version__ = "{expected}"' not in package_init:
         errors.append("version:package: __version__ does not match VERSION")
 
-    forbidden_names = ("run_" + "v2.py", "test_" + "v2_", "/v" + "2/")
+    forbidden_names = ("run_" + "experimental.py", "test_" + "experimental_", "/" + "experi" + "mental/")
     for path in ROOT.rglob("*"):
         if not path.is_file():
             continue

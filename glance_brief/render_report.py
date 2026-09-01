@@ -247,7 +247,7 @@ def _ai_ecosystem_source_links(value: Any, path: str) -> str:
             break
     if not selected:
         selected = candidates[:1]
-    return "•".join(f"[{item['label']}]({item['url']})" for item in selected)
+    return " · ".join(f"[{item['label']}]({item['url']})" for item in selected)
 
 
 def _english_title(value: str) -> bool:
@@ -294,7 +294,7 @@ def _render_agents(semantic: Mapping[str, Any]) -> str:
         topic = _inline(item["topic"], f"{path}.topic")
         summary = _inline(item["summary"], f"{path}.summary")
         source = _ai_ecosystem_source_links(item["provenance"], f"{path}.provenance")
-        lines.append(f"- {_circled(index)} **{topic}**：{summary}（来源：{source}）")
+        lines.append(f"- {_circled(index)} {topic}：{summary}（来源：{source}）")
     # The Codex block is producer-owned.  Do not parse, normalize, or rebuild it.
     codex = sections["codexradar"]["markdown"]
     lines.extend(["", codex, "", "**🔥 开源热点趋势**"])
@@ -307,19 +307,24 @@ def _render_agents(semantic: Mapping[str, Any]) -> str:
             description = _inline(project["description"], f"sections.open_source.fresh_hot[{index}].description", allow_empty=True)
             suffix = f"「{description}」" if description else ""
             lines.append(f"- {_project_link(project, f'sections.open_source.fresh_hot[{index}]')}{suffix}(+{project['stars_today']}★/日)")
+    lines.extend(["", "📦**最热门开源**"])
     for index, category in enumerate(open_source["categories"], 1):
         lines.extend(["", f"{_circled(index)} {_inline(category['title'], f'sections.open_source.categories[{index - 1}].title')}"])
-        project = category["project"]
-        if project is None:
-            lines.append("- 热门项目：信息有限")
+        projects = category["projects"]
+        if not projects:
+            lines.append("- 信息有限")
         else:
-            fresh_prefix = bool(project.get("is_fresh_hot"))
-            description = _inline(project["description"], f"sections.open_source.categories[{index - 1}].project.description", allow_empty=True)
-            suffix = f"「{description}」" if description else ""
-            lines.append(
-                f"- 热门项目：{_project_link(project, f'sections.open_source.categories[{index - 1}].project', fresh_prefix=fresh_prefix)}"
-                f"{suffix}(+{project['stars_today']}★/日)"
-            )
+            rendered_projects = []
+            for project_index, project in enumerate(projects):
+                project_path = f"sections.open_source.categories[{index - 1}].projects[{project_index}]"
+                fresh_prefix = bool(project.get("is_fresh_hot"))
+                description = _inline(project["description"], f"{project_path}.description", allow_empty=True)
+                suffix = f"「{description}」" if description else ""
+                rendered_projects.append(
+                    f"{_project_link(project, project_path, fresh_prefix=fresh_prefix)}"
+                    f"{suffix}(+{project['stars_today']}★/日)"
+                )
+            lines.append("- " + " · ".join(rendered_projects))
     return "\n".join(lines).rstrip() + "\n"
 
 

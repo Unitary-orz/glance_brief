@@ -533,9 +533,15 @@ def displayed_open_source_ids(assembled: Mapping[str, Any]) -> list[str]:
     for index, (_title, refs) in enumerate(categories):
         if not refs:
             raise contracts.ContractError("category mapping projects must be non-empty")
-        cid = _ref_id(refs[0], by_id, by_name, f"metadata.open_source.local_report_categories[{index}].projects[0]")
-        if cid not in result:
-            result.append(cid)
+        for ref_index, ref in enumerate(refs[:3]):
+            cid = _ref_id(
+                ref,
+                by_id,
+                by_name,
+                f"metadata.open_source.local_report_categories[{index}].projects[{ref_index}]",
+            )
+            if cid not in result:
+                result.append(cid)
     return result
 
 
@@ -669,8 +675,11 @@ def resolve_agents(
     for cid, description in translated_descriptions.items():
         project_cache[cid]["description"] = description
     for index, title in enumerate(category_titles):
-        cid = resolved_category_ids[index][0]
-        category_rows.append({"title": title, "project": copy.deepcopy(project_cache[cid])})
+        category_ids = resolved_category_ids[index][:3]
+        category_rows.append({
+            "title": title,
+            "projects": [copy.deepcopy(project_cache[cid]) for cid in category_ids],
+        })
 
     quality = copy.deepcopy(open_metadata.get("quality", {}))
     if not isinstance(quality, Mapping):

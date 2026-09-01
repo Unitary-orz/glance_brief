@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class FormalReleaseLayoutTests(unittest.TestCase):
     def test_formal_package_replaces_experimental_tree_for_both_reports(self):
-        self.assertFalse((ROOT / "v2").exists())
+        self.assertFalse((ROOT / "experimental").exists())
         package = ROOT / "glance_brief"
         for relative in (
             "__init__.py",
@@ -94,15 +94,22 @@ class FormalReleaseLayoutTests(unittest.TestCase):
         self.assertNotIn("hermes chat", core_text.lower())
         self.assertNotIn('"--provider"', core_text)
 
-    def test_active_tree_has_no_experimental_v2_names_or_references(self):
+    def test_active_tree_has_no_experimental_names_or_references(self):
         excluded_parts = {".git", "__pycache__", "legacy"}
         bad_paths = []
         bad_text = []
-        markers = ("v2/", "run_v2", "test_v2", "from v2", "import v2", "-v2.md")
+        markers = (
+            "experimental/",
+            "run_experimental",
+            "test_experimental",
+            "from experimental",
+            "import experimental",
+            "-experimental.md",
+        )
         for path in ROOT.rglob("*"):
             if path == Path(__file__).resolve() or any(part in excluded_parts for part in path.parts):
                 continue
-            if "v2" in path.name.lower():
+            if "experimental" in path.name.lower():
                 bad_paths.append(str(path.relative_to(ROOT)))
             if path.is_file() and path.suffix in {".py", ".md", ".json", ".toml", ".yml", ".yaml"}:
                 text = path.read_text(encoding="utf-8")

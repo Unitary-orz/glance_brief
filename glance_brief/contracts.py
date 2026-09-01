@@ -337,11 +337,14 @@ def _validate_agents(value: Mapping[str, Any]) -> None:
     for index, category_value in enumerate(categories):
         path = f"resolved.sections.open_source.categories[{index}]"
         category = _require_mapping(category_value, path)
-        _only_keys(category, {"title", "project"}, path)
-        _required(category, {"title", "project"}, path)
+        _only_keys(category, {"title", "projects"}, path)
+        _required(category, {"title", "projects"}, path)
         safe_text(category["title"], f"{path}.title")
-        if category["project"] is not None:
-            _validate_project(category["project"], f"{path}.project")
+        projects = _require_list(category["projects"], f"{path}.projects")
+        if len(projects) > 3:
+            raise ContractError(f"{path}.projects must contain at most three items")
+        for project_index, project in enumerate(projects):
+            _validate_project(project, f"{path}.projects[{project_index}]")
     quality = _require_mapping(source["quality"], "resolved.sections.open_source.quality")
     if quality.get("ok") is not True:
         raise ContractError("resolved.sections.open_source.quality.ok must be true")

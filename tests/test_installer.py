@@ -42,7 +42,11 @@ class FormalInstallerTests(unittest.TestCase):
     def _agent_descriptions(self, assembled):
         open_metadata = assembled["metadata"]["open_source"]
         names = [item["full_name"] for item in open_metadata["fresh_hot"]]
-        names.extend(category["projects"][0] for category in open_metadata["local_report_categories"])
+        names.extend(
+            name
+            for category in open_metadata["local_report_categories"]
+            for name in category["projects"][:3]
+        )
         by_name = {}
         for cid in assembled["sections"]["open_source"]:
             candidate = assembled["candidate_registry"][cid]
