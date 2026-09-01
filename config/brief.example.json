@@ -60,6 +60,7 @@
       "map": {
         "title": "full_name",
         "text": "description",
+        "strip_urls_from_text": true,
         "extra": {
           "full_name": "full_name",
           "description": "description",

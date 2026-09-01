@@ -388,15 +388,24 @@ class OutputContractTests(unittest.TestCase):
         prompt = (ROOT / "glance_brief/prompts/agents-report.md").read_text(encoding="utf-8")
         self.assertIn("只输出一个 JSON 对象", prompt)
         self.assertIn("ai_ecosystem", prompt)
+        self.assertIn("open_source_display_ids", prompt)
+        self.assertIn("open_source_descriptions", prompt)
+        self.assertIn("description_zh", prompt)
         self.assertIn("open_source_trends", prompt)
         self.assertIn("不得输出 URL", prompt)
         self.assertIn("不得输出 CodexRadar 内容", prompt)
+        self.assertIn("仅按外层 runtime 指令保存 JSON 并调用 renderer", prompt)
+        self.assertNotIn("不要调用工具", prompt)
         self.assertNotIn("## 固定输出结构", prompt)
 
-    def test_agents_prompt_limits_selection_without_padding(self):
+    def test_agents_prompt_prioritizes_ecosystem_coverage(self):
         prompt = (ROOT / "glance_brief/prompts/agents-report.md").read_text(encoding="utf-8")
-        self.assertIn("选择 1–3 条重要动态", prompt)
-        self.assertIn("证据不足时可以少选", prompt)
+        self.assertIn("按事件、进展或明确互补主题做内部聚类", prompt)
+        self.assertIn("候选池达到 5 条时", prompt)
+        self.assertIn("不能因为“最多三条”而直接挑三篇单候选新闻", prompt)
+        self.assertIn("可用分号并列", prompt)
+        self.assertIn("写入前逐条自检字符数", prompt)
+        self.assertIn("证据不足时少选", prompt)
         self.assertIn("必须恰好两条", prompt)
 
     def test_noon_prompt_allows_only_source_supported_forecasts(self):

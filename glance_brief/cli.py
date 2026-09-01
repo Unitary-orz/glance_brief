@@ -28,6 +28,7 @@ ARTIFACT_NAMES = (
     "assembled.json",
     "model-payload.json",
     "model-prompt.txt",
+    "prepared.json",
     "model-response.raw.txt",
     "model-response.json",
     "resolved.json",
@@ -66,6 +67,8 @@ def write_manifest(output: Path, *, report: str, status: str, extra: Mapping[str
         "assembled.json",
         "model-payload.json",
         "model-prompt.txt",
+        "prepared.json",
+        "model-response.input.json",
         "model-response.raw.txt",
         "model-response.json",
         "resolved.json",
@@ -154,6 +157,7 @@ def build_model_payload(report_id: str, assembled: Mapping[str, Any]) -> dict[st
                 "ai_ecosystem",
                 extra_allow={"category", "source", "type"},
             ),
+            "open_source_display_ids": resolve.displayed_open_source_ids(assembled),
             "open_source_context": _section_candidates(
                 assembled,
                 "open_source",
@@ -180,17 +184,25 @@ def _report_date(value: str | None) -> str:
     return contracts.date(selected, "report date")
 
 
-def _clear_known_artifacts(output: Path) -> None:
+def _clear_known_artifacts(output: Path, *, preserve: set[str] | None = None) -> None:
     output.mkdir(parents=True, exist_ok=True)
+    preserve = preserve or set()
     for name in ARTIFACT_NAMES:
+        if name in preserve:
+            continue
         path = output / name
         if path.exists():
             path.unlink()
 
 
-def run_pipeline(args: argparse.Namespace, *, model_runner=None) -> Path:
+def run_pipeline(
+    args: argparse.Namespace,
+    *,
+    model_runner=None,
+    preserve_artifacts: set[str] | None = None,
+) -> Path:
     output = args.output_dir.resolve()
-    _clear_known_artifacts(output)
+    _clear_known_artifacts(output, preserve=preserve_artifacts)
     failure_path = output / "failure.json"
     try:
         config = load_json(args.config)
@@ -259,6 +271,136 @@ def run_pipeline(args: argparse.Namespace, *, model_runner=None) -> Path:
             if path.exists():
                 path.unlink()
         write_manifest(output, report=args.report, status="failed")
+        raise
+
+
+def prepare_pipeline(args: argparse.Namespace) -> Path:
+    """Assemble immutable evidence for a runtime-owned semantic model call."""
+    output = args.output_dir.resolve()
+    _clear_known_artifacts(output)
+    try:
+        stale_semantic = output / "model-response.input.json"
+        if stale_semantic.exists():
+            stale_semantic.unlink()
+        config = load_json(args.config)
+        adapters.validate_config(config)
+        assembled = adapters.assemble_report(config, args.report, args.config.resolve().parent)
+        write_json(output / "assembled.json", assembled)
+        adapters.validate_assembly_health(config, args.report, assembled)
+
+        model_payload = build_model_payload(args.report, assembled)
+        write_json(output / "model-payload.json", model_payload)
+        contract_path = HERE / "prompts" / f"{args.report}.md"
+        prompt = build_model_prompt(contract_path.read_text(encoding="utf-8"), model_payload)
+        write_text(output / "model-prompt.txt", prompt)
+
+        prepared = {
+            "schema_version": 1,
+            "report": args.report,
+            "report_date": _report_date(args.date),
+            "prepared_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+            "config_sha256": _sha256(args.config.resolve()),
+            "model": getattr(args, "model", None),
+            "provider": getattr(args, "provider", None),
+            "reasoning": getattr(args, "reasoning", None),
+            "artifacts": {
+                name: _sha256(output / name)
+                for name in ("assembled.json", "model-payload.json", "model-prompt.txt")
+            },
+        }
+        write_json(output / "prepared.json", prepared)
+        return output / "prepared.json"
+    except Exception as exc:
+        write_json(output / "failure.json", {"error_type": type(exc).__name__, "error": str(exc)})
+        for name in ("resolved.json", "warnings.json", "report.md"):
+            path = output / name
+            if path.exists():
+                path.unlink()
+        write_manifest(output, report=args.report, status="failed", extra={"mode": "prepare"})
+        raise
+
+
+def _verified_prepared_artifact(output: Path, prepared: Mapping[str, Any], name: str) -> Path:
+    artifacts = prepared.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise contracts.ContractError("prepared.artifacts must be an object")
+    expected = artifacts.get(name)
+    if not isinstance(expected, str) or len(expected) != 64:
+        raise contracts.ContractError(f"prepared artifact hash is missing for {name}")
+    path = output / name
+    if not path.is_file():
+        raise contracts.ContractError(f"prepared artifact is missing: {name}")
+    if _sha256(path) != expected:
+        raise contracts.ContractError(f"prepared artifact hash mismatch for {name}")
+    return path
+
+
+def render_prepared_pipeline(args: argparse.Namespace) -> Path:
+    """Resolve and render one verified prepared run without reloading sources."""
+    output = args.output_dir.resolve()
+    report_id = "unknown"
+    try:
+        config = load_json(args.config)
+        adapters.validate_config(config)
+        prepared = load_json(output / "prepared.json")
+        report_value = prepared.get("report")
+        if report_value not in REPORTS:
+            raise contracts.ContractError("prepared report is unsupported")
+        report_id = str(report_value)
+        if prepared.get("config_sha256") != _sha256(args.config.resolve()):
+            raise contracts.ContractError("config changed after semantic preparation")
+        report_date = contracts.date(prepared.get("report_date"), "prepared.report_date")
+        for name in ("assembled.json", "model-payload.json", "model-prompt.txt"):
+            _verified_prepared_artifact(output, prepared, name)
+        assembled = load_json(output / "assembled.json")
+        if assembled.get("report") != report_id:
+            raise contracts.ContractError("prepared report differs from assembled report")
+
+        raw = args.model_response.read_text(encoding="utf-8")
+        write_text(output / "model-response.raw.txt", raw)
+        usage = {
+            "mode": "agent-handoff",
+            "model": prepared.get("model"),
+            "provider": prepared.get("provider"),
+            "reasoning": prepared.get("reasoning"),
+        }
+        write_json(output / "usage.json", usage)
+        model_object = resolve.parse_model_response(raw)
+        write_json(output / "model-response.json", model_object)
+        generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+        resolved, warnings = resolve.resolve_report(
+            report_id,
+            model_object,
+            assembled,
+            report_date,
+            generated_at=generated_at,
+        )
+        write_json(output / "resolved.json", resolved)
+        write_json(output / "warnings.json", warnings)
+        write_text(output / "report.md", render_report.render_report(resolved))
+        write_manifest(
+            output,
+            report=report_id,
+            status="ok",
+            extra={
+                "mode": "agent-handoff",
+                "report_date": report_date,
+                "resolved_generated_at": generated_at,
+                "prepared_at": prepared.get("prepared_at"),
+                "config_sha256": prepared.get("config_sha256"),
+                "model": prepared.get("model"),
+                "provider": prepared.get("provider"),
+                "reasoning": prepared.get("reasoning"),
+            },
+        )
+        return output / "report.md"
+    except Exception as exc:
+        write_json(output / "failure.json", {"error_type": type(exc).__name__, "error": str(exc)})
+        for name in ("resolved.json", "warnings.json", "report.md"):
+            path = output / name
+            if path.exists():
+                path.unlink()
+        write_manifest(output, report=report_id, status="failed", extra={"mode": "agent-handoff"})
         raise
 
 
@@ -368,6 +510,18 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--date", help="trusted YYYY-MM-DD report date")
     run.add_argument("--stdout-report", action="store_true", help="write report Markdown to stdout instead of its path")
 
+    prepare = commands.add_parser("prepare", help="assemble immutable evidence for a runtime-owned model call")
+    prepare.add_argument("--config", required=True, type=Path)
+    prepare.add_argument("--report", required=True, choices=REPORTS)
+    prepare.add_argument("--output-dir", required=True, type=Path)
+    prepare.add_argument("--date", help="trusted YYYY-MM-DD report date")
+
+    render_prepared = commands.add_parser("render-prepared", help="render one prepared run from runtime-supplied semantic JSON")
+    render_prepared.add_argument("--config", required=True, type=Path)
+    render_prepared.add_argument("--output-dir", required=True, type=Path)
+    render_prepared.add_argument("--model-response", required=True, type=Path)
+    render_prepared.add_argument("--stdout-report", action="store_true", help="write report Markdown to stdout instead of its path")
+
     replay = commands.add_parser("replay", help="re-resolve and render a verified prior run")
     replay.add_argument("--input-dir", required=True, type=Path)
     replay.add_argument("--output-dir", required=True, type=Path)
@@ -380,6 +534,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "replay":
             path = replay_pipeline(args)
             print(path)
+            return 0
+        if args.command == "prepare":
+            print(prepare_pipeline(args))
+            return 0
+        if args.command == "render-prepared":
+            path = render_prepared_pipeline(args)
+            if args.stdout_report:
+                print(path.read_text(encoding="utf-8"), end="")
+            else:
+                print(path)
             return 0
         config = load_json(args.config)
         adapters.validate_config(config)

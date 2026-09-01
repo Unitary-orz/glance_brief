@@ -30,7 +30,6 @@ LEGACY_KEYS = frozenset(
         "protocol",
         "item_ref",
         "item_refs",
-        "candidate_ids",
         "hot_projects",
         "other_projects",
         "title",  # model detail title alias; source candidates use headline
@@ -139,6 +138,29 @@ def candidate_id(value: Any, path: str) -> str:
     if not isinstance(value, str) or not _CANDIDATE_ID_RE.fullmatch(value):
         raise ContractError(f"{path} must be a stable candidate ID")
     return value
+
+
+def candidate_ids(value: Any, path: str, *, max_count: int | None = None) -> list[str]:
+    """Validate a non-empty, ordered group of stable candidate IDs."""
+    ids = _require_list(value, path)
+    if not ids:
+        raise ContractError(f"{path} must contain at least one candidate ID")
+    if max_count is not None and len(ids) > max_count:
+        raise ContractError(f"{path} must contain at most {max_count} candidate IDs")
+    checked = [candidate_id(item, f"{path}[{index}]") for index, item in enumerate(ids)]
+    if len(set(checked)) != len(checked):
+        raise ContractError(f"{path} must not contain duplicate candidate IDs")
+    return checked
+
+
+def short_topic(value: Any, path: str = "topic") -> str:
+    """Validate a compact renderer-owned lead label."""
+    text = safe_text(value, path)
+    if not 2 <= len(text) <= 16:
+        raise ContractError(f"{path} must contain 2-16 characters")
+    if re.search(r"[:：,，;；。！？!?]", text):
+        raise ContractError(f"{path} must be a short label without sentence punctuation")
+    return text
 
 
 def validate_provenance(value: Any, path: str = "provenance") -> None:
@@ -286,12 +308,14 @@ def _validate_agents(value: Mapping[str, Any]) -> None:
     for index, item_value in enumerate(ai_items):
         path = f"resolved.sections.ai_ecosystem[{index}]"
         item = _require_mapping(item_value, path)
-        _only_keys(item, {"candidate_id", "summary", "provenance"}, path)
-        _required(item, {"candidate_id", "summary", "provenance"}, path)
-        cid = candidate_id(item["candidate_id"], f"{path}.candidate_id")
-        if cid in seen:
-            raise ContractError(f"{path}.candidate_id is reused")
-        seen.add(cid)
+        _only_keys(item, {"candidate_ids", "topic", "summary", "provenance"}, path)
+        _required(item, {"candidate_ids", "topic", "summary", "provenance"}, path)
+        ids = candidate_ids(item["candidate_ids"], f"{path}.candidate_ids", max_count=3)
+        reused = set(ids) & seen
+        if reused:
+            raise ContractError(f"{path}.candidate_ids reuses {sorted(reused)!r}")
+        seen.update(ids)
+        short_topic(item["topic"], f"{path}.topic")
         safe_text(item["summary"], f"{path}.summary")
         validate_provenance(item["provenance"], f"{path}.provenance")
     codex = _require_mapping(sections["codexradar"], "resolved.sections.codexradar")

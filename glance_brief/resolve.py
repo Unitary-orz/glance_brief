@@ -13,6 +13,40 @@ from urllib.parse import urlsplit
 from . import adapters, contracts
 
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])[-+]?(?:\d{1,3}(?:[,，]\d{3})+|\d+)(?:\.\d+)?%?")
+_ENGLISH_MONTHS = {
+    "january": "1",
+    "february": "2",
+    "march": "3",
+    "april": "4",
+    "may": "5",
+    "june": "6",
+    "july": "7",
+    "august": "8",
+    "september": "9",
+    "october": "10",
+    "november": "11",
+    "december": "12",
+}
+_ENGLISH_MONTH_RE = re.compile(
+    r"\b(" + "|".join(sorted(_ENGLISH_MONTHS, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE,
+)
+_CJK_DATE_NUMBER_RE = re.compile(r"([零〇一二三四五六七八九十百千万两]+)(?=[年月日号])")
+_CJK_DIGITS = {
+    "零": 0,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+_CJK_UNITS = {"十": 10, "百": 100, "千": 1000, "万": 10000}
 _SUMMARY_MAX_CHARS = 300
 
 
@@ -59,6 +93,7 @@ def _numbers(value: Any) -> set[str]:
     found: set[str] = set()
     if isinstance(value, str):
         found.update(token.replace(",", "").replace("，", "") for token in _NUMBER_RE.findall(value))
+        found.update(_date_number_tokens(value))
     elif isinstance(value, Mapping):
         for child in value.values():
             found.update(_numbers(child))
@@ -68,18 +103,67 @@ def _numbers(value: Any) -> set[str]:
     return found
 
 
-def _check_supported_numbers(summary: str, candidate: Mapping[str, Any], path: str) -> None:
-    evidence = _numbers({"title": candidate.get("title"), "text": candidate.get("text"), "extra": candidate.get("extra")})
-    unsupported = _numbers(summary) - evidence
+def _cjk_integer(value: str) -> int | None:
+    if not value or any(char not in _CJK_DIGITS and char not in _CJK_UNITS for char in value):
+        return None
+    if not any(char in _CJK_UNITS for char in value):
+        digits = "".join(str(_CJK_DIGITS[char]) for char in value)
+        return int(digits) if digits else None
+    total = 0
+    section = 0
+    number = 0
+    for char in value:
+        if char in _CJK_DIGITS:
+            number = _CJK_DIGITS[char]
+        else:
+            unit = _CJK_UNITS[char]
+            if unit == 10000:
+                total += (section + (number or 0)) * unit
+                section = 0
+            else:
+                section += (number or 1) * unit
+            number = 0
+    return total + section + number
+
+
+def _date_number_tokens(value: str) -> set[str]:
+    found = {str(_ENGLISH_MONTHS[match.group(1).casefold()]) for match in _ENGLISH_MONTH_RE.finditer(value)}
+    for match in _CJK_DATE_NUMBER_RE.finditer(value):
+        number = _cjk_integer(match.group(1))
+        if number is not None:
+            found.add(str(number))
+    return found
+
+
+def _check_supported_numbers(summary: str, evidence: Any, path: str) -> None:
+    if isinstance(evidence, Mapping):
+        source = {"title": evidence.get("title"), "text": evidence.get("text"), "extra": evidence.get("extra")}
+    elif isinstance(evidence, list):
+        source = [
+            {"title": candidate.get("title"), "text": candidate.get("text"), "extra": candidate.get("extra")}
+            for candidate in evidence
+            if isinstance(candidate, Mapping)
+        ]
+    else:
+        source = evidence
+    found = _numbers(source)
+    unsupported = _numbers(summary) - found
     if unsupported:
         raise contracts.ContractError(f"{path} contains unsupported number(s): {sorted(unsupported)!r}")
 
 
-def _check_summary(value: Any, candidate: Mapping[str, Any], path: str) -> str:
+def _check_summary(value: Any, evidence: Any, path: str, *, max_chars: int = _SUMMARY_MAX_CHARS) -> str:
     summary = _safe_model_text(value, path)
-    if len(summary) > _SUMMARY_MAX_CHARS:
-        raise contracts.ContractError(f"{path} must be at most {_SUMMARY_MAX_CHARS} characters")
-    _check_supported_numbers(summary, candidate, path)
+    if len(summary) > max_chars:
+        raise contracts.ContractError(f"{path} must be at most {max_chars} characters")
+    _check_supported_numbers(summary, evidence, path)
+    return summary
+
+
+def _check_ai_summary(value: Any, candidates: list[Mapping[str, Any]], path: str) -> str:
+    summary = _check_summary(value, candidates, path, max_chars=140)
+    if re.search(r"\bRSS\b|RSS\s*(?:源|feed)|网页\s*(?:采集|抓取)|(?:web|atom)\s*feed", summary, re.I):
+        raise contracts.ContractError(f"{path} contains source-collection implementation detail")
     return summary
 
 
@@ -105,12 +189,68 @@ def _candidate(registry: Mapping[str, Any], sections: Mapping[str, Any], section
     return cid, candidate
 
 
+def _candidate_group(
+    registry: Mapping[str, Any],
+    sections: Mapping[str, Any],
+    section_id: str,
+    value: Any,
+    path: str,
+    used: set[str],
+) -> tuple[list[str], list[Mapping[str, Any]]]:
+    if not isinstance(value, Mapping):
+        raise contracts.ContractError(f"{path} must be an object")
+    contracts.reject_legacy_model_keys(value, path)
+    ids = contracts.candidate_ids(value.get("candidate_ids"), f"{path}.candidate_ids", max_count=3)
+    section_ids = sections.get(section_id)
+    if not isinstance(section_ids, list):
+        raise contracts.ContractError(f"assembled section {section_id} must be an array")
+    candidates: list[Mapping[str, Any]] = []
+    for index, cid in enumerate(ids):
+        if cid not in registry:
+            raise contracts.ContractError(f"{path}.candidate_ids[{index}] is unknown")
+        if cid not in section_ids:
+            raise contracts.ContractError(f"{path}.candidate_ids[{index}] is outside section {section_id}")
+        if cid in used:
+            raise contracts.ContractError(f"{path}.candidate_ids reuses {cid!r}")
+        candidate = registry[cid]
+        if not isinstance(candidate, Mapping):
+            raise contracts.ContractError(f"candidate registry entry {cid!r} is invalid")
+        candidates.append(candidate)
+    used.update(ids)
+    return ids, candidates
+
+
 def _candidate_provenance(candidate: Mapping[str, Any], path: str) -> list[dict[str, Any]]:
     provenance = copy.deepcopy(candidate.get("provenance", []))
     # Source adapters may intentionally create evidence-only candidates without
     # links.  A selected report item, however, must be source-backed.
     contracts.validate_provenance(provenance, path)
     return provenance
+
+
+def _merge_provenance(candidates: list[Mapping[str, Any]], path: str) -> list[dict[str, Any]]:
+    """Merge source channels while preserving every candidate-backed URL once."""
+    merged: dict[str, dict[str, Any]] = {}
+    seen_urls: dict[str, set[str]] = {}
+    for index, candidate in enumerate(candidates):
+        provenance = _candidate_provenance(candidate, f"{path}.candidate[{index}]")
+        for channel in provenance:
+            channel_id = channel["channel_id"]
+            if channel_id not in merged:
+                merged[channel_id] = {
+                    "channel_id": channel_id,
+                    "channel_label": channel["channel_label"],
+                    "links": [],
+                }
+                seen_urls[channel_id] = set()
+            for link in channel["links"]:
+                url = link["url"]
+                if url not in seen_urls[channel_id]:
+                    merged[channel_id]["links"].append(copy.deepcopy(link))
+                    seen_urls[channel_id].add(url)
+    result = list(merged.values())
+    contracts.validate_provenance(result, path)
+    return result
 
 
 def _noon_model_sections(model: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -354,6 +494,51 @@ def _trend_summary(value: Any, path: str, project_tokens: set[str]) -> str:
     return summary
 
 
+def displayed_open_source_ids(assembled: Mapping[str, Any]) -> list[str]:
+    """Return the program-owned open-source projects that will be rendered."""
+    registry, sections = _registry(assembled, contracts.AGENTS_REPORT)
+    open_ids = sections.get("open_source")
+    if not isinstance(open_ids, list):
+        raise contracts.ContractError("assembled agents open_source section is invalid")
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for cid in open_ids:
+        if not isinstance(cid, str) or cid not in registry or not isinstance(registry[cid], Mapping):
+            raise contracts.ContractError("assembled agents open_source section references an invalid candidate")
+        by_id[cid] = registry[cid]
+    by_name: dict[str, str] = {}
+    for cid, candidate in by_id.items():
+        extra = candidate.get("extra", {})
+        name = extra.get("full_name") if isinstance(extra, Mapping) else None
+        name = name or candidate.get("title")
+        if isinstance(name, str):
+            by_name[name] = cid
+    metadata = assembled.get("metadata", {})
+    if not isinstance(metadata, Mapping):
+        raise contracts.ContractError("assembled.metadata must be an object")
+    open_metadata = metadata.get("open_source", {})
+    if not isinstance(open_metadata, Mapping):
+        raise contracts.ContractError("metadata.open_source must be an object")
+    fresh_refs = open_metadata.get("fresh_hot", [])
+    if not isinstance(fresh_refs, list):
+        raise contracts.ContractError("metadata.open_source.fresh_hot must be an array")
+    categories = _category_rows(
+        open_metadata.get("local_report_categories", []),
+        "metadata.open_source.local_report_categories",
+    )
+    result: list[str] = []
+    for index, ref in enumerate(fresh_refs):
+        cid = _ref_id(ref, by_id, by_name, f"metadata.open_source.fresh_hot[{index}]")
+        if cid not in result:
+            result.append(cid)
+    for index, (_title, refs) in enumerate(categories):
+        if not refs:
+            raise contracts.ContractError("category mapping projects must be non-empty")
+        cid = _ref_id(refs[0], by_id, by_name, f"metadata.open_source.local_report_categories[{index}].projects[0]")
+        if cid not in result:
+            result.append(cid)
+    return result
+
+
 def resolve_agents(
     model: Mapping[str, Any] | str | bytes,
     assembled: Mapping[str, Any],
@@ -441,9 +626,52 @@ def resolve_agents(
     if set(flattened_category_ids) != set(hot_ids):
         raise contracts.ContractError("category mapping must completely cover hot_today")
     category_rows: list[dict[str, Any]] = []
-    for index, (title, _refs) in enumerate(parsed_categories):
+    displayed_ids = set(displayed_open_source_ids(assembled))
+    category_titles: list[str] = []
+    for _index, (title, _refs) in enumerate(parsed_categories):
+        category_titles.append(title)
+
+    descriptions_model = model.get("open_source_descriptions")
+    if not isinstance(descriptions_model, list):
+        raise contracts.ContractError("model.open_source_descriptions must be an array")
+    translated_descriptions: dict[str, str] = {}
+    for index, value in enumerate(descriptions_model):
+        path = f"model.open_source_descriptions[{index}]"
+        if not isinstance(value, Mapping):
+            raise contracts.ContractError(f"{path} must be an object")
+        contracts.reject_legacy_model_keys(value, path)
+        unknown = set(value) - {"candidate_id", "description_zh"}
+        if unknown:
+            raise contracts.ContractError(f"{path} has unknown fields: {sorted(unknown)!r}")
+        if set(value) != {"candidate_id", "description_zh"}:
+            raise contracts.ContractError(f"{path} must contain candidate_id and description_zh")
+        cid_value = value.get("candidate_id")
+        cid = contracts.candidate_id(cid_value, f"{path}.candidate_id")
+        if cid not in by_id:
+            raise contracts.ContractError(f"{path}.candidate_id is unknown")
+        if cid not in displayed_ids:
+            raise contracts.ContractError(f"{path}.candidate_id is not a displayed project")
+        if cid in translated_descriptions:
+            raise contracts.ContractError(f"{path}.candidate_id is reused")
+        description = contracts.safe_text(value.get("description_zh"), f"{path}.description_zh")
+        if len(description) > _SUMMARY_MAX_CHARS:
+            raise contracts.ContractError(f"{path}.description_zh must be at most {_SUMMARY_MAX_CHARS} characters")
+        if not re.search(r"[\u3400-\u9fff]", description):
+            raise contracts.ContractError(f"{path}.description_zh must contain Chinese text")
+        _check_supported_numbers(description, by_id[cid], f"{path}.description_zh")
+        translated_descriptions[cid] = description
+    if set(translated_descriptions) != displayed_ids:
+        missing = sorted(displayed_ids - set(translated_descriptions))
+        extra = sorted(set(translated_descriptions) - displayed_ids)
+        raise contracts.ContractError(
+            f"model.open_source_descriptions must cover displayed projects exactly; missing={missing!r}, extra={extra!r}"
+        )
+    for cid, description in translated_descriptions.items():
+        project_cache[cid]["description"] = description
+    for index, title in enumerate(category_titles):
         cid = resolved_category_ids[index][0]
         category_rows.append({"title": title, "project": copy.deepcopy(project_cache[cid])})
+
     quality = copy.deepcopy(open_metadata.get("quality", {}))
     if not isinstance(quality, Mapping):
         raise contracts.ContractError("metadata.open_source.quality must be an object")
@@ -453,15 +681,36 @@ def resolve_agents(
         raise contracts.ContractError("model.ai_ecosystem must contain at most three items")
     seen_ai: set[str] = set()
     ai_resolved: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
     for index, item in enumerate(ai_model):
         path = f"model.ai_ecosystem[{index}]"
-        cid, candidate = _candidate(registry, assembled_sections, "ai_ecosystem", item, path, seen_ai)
-        summary = _check_summary(item.get("summary"), candidate, f"{path}.summary")
+        candidate_id_list, candidates = _candidate_group(
+            registry,
+            assembled_sections,
+            "ai_ecosystem",
+            item,
+            path,
+            seen_ai,
+        )
+        topic = contracts.short_topic(item.get("topic"), f"{path}.topic")
+        summary = _check_ai_summary(item.get("summary"), candidates, f"{path}.summary")
         ai_resolved.append({
-            "candidate_id": cid,
+            "candidate_ids": candidate_id_list,
+            "topic": topic,
             "summary": summary,
-            "provenance": _candidate_provenance(candidate, f"resolved.sections.ai_ecosystem[{index}].provenance"),
+            "provenance": _merge_provenance(candidates, f"resolved.sections.ai_ecosystem[{index}].provenance"),
         })
+    if len(ai_ids) >= 5:
+        coverage_target = min(5, len(ai_ids))
+        if len(seen_ai) < coverage_target:
+            warnings.append(
+                {
+                    "code": "ai_ecosystem_coverage",
+                    "available_candidates": len(ai_ids),
+                    "selected_candidates": len(seen_ai),
+                    "target_candidates": coverage_target,
+                }
+            )
     trends_model = model.get("open_source_trends")
     if not isinstance(trends_model, list) or len(trends_model) != 2:
         raise contracts.ContractError("model.open_source_trends must contain exactly two items")
@@ -482,4 +731,4 @@ def resolve_agents(
         },
     }
     contracts.validate_resolved(resolved)
-    return resolved, []
+    return resolved, warnings

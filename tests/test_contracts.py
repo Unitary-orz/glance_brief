@@ -363,6 +363,19 @@ class ResolverContractTests(unittest.TestCase):
         self.assertEqual(resolve._numbers("Qwen3.8 27B 模型"), {"27"})
         self.assertEqual(resolve._numbers("上下文为262，144 token"), {"262144"})
 
+    def test_date_localization_accepts_english_and_cjk_month_forms(self):
+        evidence = {"title": "Oil prices", "text": "Brent peaked at $94.40 on August 21."}
+        resolve._check_supported_numbers(
+            "布伦特原油自8月21日触及94.40美元以来持续震荡",
+            evidence,
+            "model.sections.international[0].summary",
+        )
+        resolve._check_supported_numbers(
+            "布伦特原油自八月二十一日触及94.40美元以来持续震荡",
+            evidence,
+            "model.sections.international[0].summary",
+        )
+
     def test_headline_translation_length_is_a_soft_warning(self):
         model = self._model()
         model["sections"]["international"][0]["headline_zh"] = "中文过短"
@@ -435,10 +448,14 @@ class AgentsCurrentContractTests(unittest.TestCase):
 
     def _model(self):
         return {
-            "ai_ecosystem": [{"candidate_id": "caaaaaaaaaaaaaaaa", "summary": "AI 生态出现新的协作信号。"}],
+            "ai_ecosystem": [{"candidate_ids": ["caaaaaaaaaaaaaaaa"], "topic": "生态协作", "summary": "AI 生态出现新的协作信号。"}],
             "open_source_trends": [
                 {"summary": "开源工具继续向更轻量的工作流整合。"},
                 {"summary": "社区正在加强评测与本地化部署的协同。"},
+            ],
+            "open_source_descriptions": [
+                {"candidate_id": "cbbbbbbbbbbbbbbbb", "description_zh": "用于构建紧凑型智能体运行时。"},
+                {"candidate_id": "cccccccccccccccc", "description_zh": "用于本地 AI 系统的实用评测工具包。"},
             ],
             "harmless_debug": "ignored",
         }
@@ -450,8 +467,11 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertEqual(resolved["sections"]["codexradar"]["markdown"], assembled["metadata"]["codexradar"]["markdown"])
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["name"], "acme/alpha")
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["url"], "https://github.com/acme/alpha")
+        self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["description"], "用于构建紧凑型智能体运行时。")
         self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["title"], "Agent 工具")
         self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["project"]["name"], "acme/alpha")
+        self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["project"]["description"], "用于构建紧凑型智能体运行时。")
+        self.assertEqual(resolved["sections"]["open_source"]["categories"][1]["project"]["description"], "用于本地 AI 系统的实用评测工具包。")
         self.assertEqual(resolved["sections"]["open_source"]["trends"], [item["summary"] for item in self._model()["open_source_trends"]])
         self.assertEqual(warnings, [])
         contracts.validate_resolved(resolved)
@@ -461,11 +481,11 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertLess(markdown.index("**🧠 CodexRadar 智力效率**"), markdown.index("**🔥 开源热点趋势**"))
         self.assertIn(assembled["metadata"]["codexradar"]["markdown"], markdown)
         self.assertIn("**✨新热门开源**", markdown)
-        self.assertIn("- ① AI 生态出现新的协作信号。", markdown)
+        self.assertIn("- ① **生态协作**：AI 生态出现新的协作信号。", markdown)
         self.assertIn("- ① 开源工具继续向更轻量的工作流整合。", markdown)
-        self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「A compact agent runtime.」(+42★/日)", markdown)
+        self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
         self.assertIn("① Agent 工具", markdown)
-        self.assertIn("- 热门项目：✨ [acme/alpha](https://github.com/acme/alpha)「A compact agent runtime.」(+42★/日)", markdown)
+        self.assertIn("- 热门项目：✨ [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
         self.assertNotIn("其他项目", markdown)
         self.assertNotIn("\n---\n", markdown)
 
@@ -481,6 +501,29 @@ class AgentsCurrentContractTests(unittest.TestCase):
             assembled["metadata"]["open_source"]["local_report_categories"] = categories
             with self.assertRaisesRegex(ValueError, "categor|cover|unique|duplicate"):
                 resolve.resolve_agents(self._model(), assembled, "2026-08-30")
+
+    def test_agents_resolver_requires_exact_chinese_descriptions_for_displayed_projects(self):
+        cases = []
+
+        missing = self._model()
+        del missing["open_source_descriptions"][1]
+        cases.append((missing, "cover displayed projects exactly"))
+
+        hidden = self._model()
+        hidden["open_source_descriptions"].append({
+            "candidate_id": "cdddddddddddddddd",
+            "description_zh": "用于本地模型的工具。",
+        })
+        cases.append((hidden, "not a displayed project"))
+
+        english = self._model()
+        english["open_source_descriptions"][0]["description_zh"] = "A compact agent runtime."
+        cases.append((english, "must contain Chinese text"))
+
+        for model, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    resolve.resolve_agents(model, self._assembled(), "2026-08-30")
 
     def test_agents_resolver_rejects_non_ok_open_source_quality(self):
         assembled = self._assembled()
@@ -552,10 +595,200 @@ class PromptContractTests(unittest.TestCase):
         prompt = (ROOT / "glance_brief" / "prompts" / "agents-report.md").read_text(encoding="utf-8")
         for marker in ("只输出一个 JSON 对象", '"ai_ecosystem"', '"open_source_trends"', "必须恰好两条"):
             self.assertIn(marker, prompt)
-        for marker in ("不得输出项目名", "不得输出 URL", "不得输出 Star", "不得输出 CodexRadar"):
+        for marker in ("open_source_display_ids", "open_source_descriptions", "description_zh", "逐个填写"):
             self.assertIn(marker, prompt)
+        for marker in ("不得输出 URL", "Star", "不得输出 CodexRadar"):
+            self.assertIn(marker, prompt)
+        self.assertIn("candidate_ids", prompt)
+        self.assertIn("topic", prompt)
+        self.assertIn("同一事件或互补主题", prompt)
+        self.assertIn("RSS", prompt)
         self.assertNotIn("hot_projects", prompt)
         self.assertNotIn("other_projects", prompt)
+
+
+class AgentsMultiCandidateContractTests(unittest.TestCase):
+    def _candidate(self, cid, title, text, channel_id="aihot", channel_label="AIHOT（RSS）", link_label="原文（网页）"):
+        return {
+            "candidate_id": cid,
+            "title": title,
+            "text": text,
+            "published_at": None,
+            "extra": {"kind": "ai"},
+            "provenance": [
+                {
+                    "channel_id": channel_id,
+                    "channel_label": channel_label,
+                    "links": [
+                        {"role": "item", "label": "AIHOT", "url": f"https://aihot.test/{cid}"},
+                        {"role": "original", "label": link_label, "url": f"https://source.test/{cid}"},
+                    ],
+                }
+            ],
+        }
+
+    def _assembled(self):
+        first = "c1111111111111111"
+        second = "c2222222222222222"
+        alpha = "caaaaaaaaaaaaaaaa"
+        beta = "cbbbbbbbbbbbbbbbb"
+        gamma = "cccccccccccccccc"
+        return {
+            "schema_version": 2,
+            "report": "agents-report",
+            "candidate_registry": {
+                first: self._candidate(first, "First signal", "The first signal concerns safety."),
+                second: self._candidate(second, "Second signal", "The second signal covers 42 models.", channel_label="AIHOT（网页）", link_label="原始报道（RSS）"),
+                alpha: {
+                    "candidate_id": alpha,
+                    "title": "acme/alpha",
+                    "text": "A compact agent runtime.",
+                    "published_at": None,
+                    "extra": {"kind": "project", "full_name": "acme/alpha", "stars_today": 42},
+                    "provenance": [{"channel_id": "github", "channel_label": "GitHub", "links": [{"role": "repository", "label": "acme/alpha", "url": "https://github.com/acme/alpha"}]}],
+                },
+                beta: {
+                    "candidate_id": beta,
+                    "title": "acme/beta",
+                    "text": "A useful evaluation toolkit.",
+                    "published_at": None,
+                    "extra": {"kind": "project", "full_name": "acme/beta", "stars_today": 17},
+                    "provenance": [{"channel_id": "github", "channel_label": "GitHub", "links": [{"role": "repository", "label": "acme/beta", "url": "https://github.com/acme/beta"}]}],
+                },
+                gamma: {
+                    "candidate_id": gamma,
+                    "title": "acme/gamma",
+                    "text": "A local model utility.",
+                    "published_at": None,
+                    "extra": {"kind": "project", "full_name": "acme/gamma", "stars_today": 9},
+                    "provenance": [{"channel_id": "github", "channel_label": "GitHub", "links": [{"role": "repository", "label": "acme/gamma", "url": "https://github.com/acme/gamma"}]}],
+                },
+            },
+            "sections": {"ai_ecosystem": [first, second], "codexradar": [], "open_source": [alpha, beta, gamma]},
+            "metadata": {
+                "codexradar": {"markdown": "**🧠 CodexRadar 智力效率**\n- 综合效率：稳定"},
+                "open_source": {
+                    "hot_today": [alpha, beta, gamma],
+                    "fresh_hot": [alpha],
+                    "local_report_categories": [
+                        {"title": "Agent 工具", "projects": ["acme/alpha"]},
+                        {"title": "评测基础设施", "projects": ["acme/beta", "acme/gamma"]},
+                    ],
+                    "quality": {"ok": True},
+                },
+            },
+        }
+
+    def _model(self):
+        return {
+            "ai_ecosystem": [{
+                "candidate_ids": ["c1111111111111111", "c2222222222222222"],
+                "topic": "AI 安全与对齐",
+                "summary": "两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。",
+            }],
+            "open_source_trends": [
+                {"summary": "开源工具继续向更轻量的工作流整合。"},
+                {"summary": "社区正在加强评测与本地化部署的协同。"},
+            ],
+            "open_source_descriptions": [
+                {"candidate_id": "caaaaaaaaaaaaaaaa", "description_zh": "用于构建紧凑型智能体运行时。"},
+                {"candidate_id": "cbbbbbbbbbbbbbbbb", "description_zh": "用于本地 AI 系统的实用评测工具包。"},
+            ],
+        }
+
+    def test_low_ai_coverage_is_a_warning_not_a_hard_failure(self):
+        assembled = self._assembled()
+        for index in range(3):
+            cid = f"c{index + 3:016d}"
+            assembled["candidate_registry"][cid] = self._candidate(
+                cid, f"Additional signal {index}", f"Additional signal {index} concerns ecosystem change."
+            )
+            assembled["sections"]["ai_ecosystem"].append(cid)
+
+        _resolved, warnings = resolve.resolve_agents(self._model(), assembled, "2026-08-30")
+
+        self.assertEqual(
+            [warning["code"] for warning in warnings],
+            ["ai_ecosystem_coverage"],
+        )
+        self.assertEqual(warnings[0]["available_candidates"], 5)
+        self.assertEqual(warnings[0]["selected_candidates"], 2)
+        self.assertEqual(warnings[0]["target_candidates"], 5)
+
+    def test_multi_candidate_summary_merges_evidence_and_renders_short_topic_without_transport_labels(self):
+        resolved, warnings = resolve.resolve_agents(self._model(), self._assembled(), "2026-08-30")
+
+        item = resolved["sections"]["ai_ecosystem"][0]
+        self.assertEqual(item["candidate_ids"], ["c1111111111111111", "c2222222222222222"])
+        self.assertEqual(item["topic"], "AI 安全与对齐")
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(item["provenance"]), 1)
+        self.assertEqual(len(item["provenance"][0]["links"]), 4)
+
+        markdown = render_report.render_report(resolved)
+        self.assertIn("- ① **AI 安全与对齐**：两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。", markdown)
+        self.assertNotIn("https://aihot.test/", markdown)
+        source_line = next(line for line in markdown.splitlines() if "（来源：" in line)
+        self.assertLessEqual(source_line.count("]("), 2)
+        self.assertNotIn("RSS", markdown)
+        self.assertNotIn("网页", markdown)
+
+    def test_source_transport_cleanup_keeps_remaining_label_clean(self):
+        assembled = self._assembled()
+        first = "c1111111111111111"
+        assembled["candidate_registry"][first]["provenance"][0]["channel_label"] = "OpenAI 官网动态（RSS · 排除企业/客户案例）"
+        model = self._model()
+        model["ai_ecosystem"][0]["candidate_ids"] = [first]
+        model["ai_ecosystem"][0]["summary"] = "第一条信号关注模型安全。"
+
+        resolved, _warnings = resolve.resolve_agents(model, assembled, "2026-08-30")
+        markdown = render_report.render_report(resolved)
+
+        self.assertIn("[OpenAI]", markdown)
+        self.assertNotIn("（ ·", markdown)
+        self.assertNotIn("RSS", markdown)
+        self.assertNotIn("网页", markdown)
+
+    def test_ai_source_row_hides_aihot_deduplicates_publisher_and_prefers_article(self):
+        provenance = [
+            {
+                "channel_id": "aihot",
+                "channel_label": "AIHOT",
+                "links": [
+                    {"role": "item", "label": "AIHOT", "url": "https://aihot.test/item"},
+                    {"role": "original", "label": "X Anthropic (@AnthropicAI)", "url": "https://x.com/AnthropicAI/status/1"},
+                    {"role": "original", "label": "Anthropic Newsroom（网页）", "url": "https://anthropic.com/news/1"},
+                ],
+            },
+            {
+                "channel_id": "analysis",
+                "channel_label": "Gary Marcus",
+                "links": [{"role": "article", "label": "Gary Marcus The Road to AI We Can Trust（RSS）", "url": "https://garymarcus.test/article"}],
+            },
+        ]
+
+        rendered = render_report._ai_ecosystem_source_links(provenance, "test.provenance")
+
+        self.assertEqual(
+            rendered,
+            "[Anthropic](https://anthropic.com/news/1)•[Gary Marcus](https://garymarcus.test/article)",
+        )
+
+    def test_multi_candidate_summary_cannot_reuse_candidate_across_items(self):
+        model = self._model()
+        model["ai_ecosystem"].append({
+            "candidate_ids": ["c2222222222222222"],
+            "topic": "重复引用",
+            "summary": "重复候选不应再次出现。",
+        })
+        with self.assertRaisesRegex(ValueError, "reuse"):
+            resolve.resolve_agents(model, self._assembled(), "2026-08-30")
+
+    def test_ai_summary_rejects_source_collection_implementation_detail(self):
+        model = self._model()
+        model["ai_ecosystem"][0]["summary"] = "这是一条 RSS feed 来源说明，不是事件事实。"
+        with self.assertRaisesRegex(ValueError, "source-collection"):
+            resolve.resolve_agents(model, self._assembled(), "2026-08-30")
 
 
 if __name__ == "__main__":

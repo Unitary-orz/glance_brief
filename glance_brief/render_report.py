@@ -5,6 +5,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 from . import contracts
 
@@ -26,7 +27,25 @@ def _label(value: Any, path: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _source_links(value: Any, path: str, *, separator: str = "•") -> str:
+def _source_label(value: Any, path: str) -> str:
+    """Hide transport metadata while keeping the publisher/channel identity."""
+    text = _label(value, path)
+    text = re.sub(r"(?i)\b(?:rss|atom\s+feed|web\s+feed|feed)\b", "", text)
+    text = re.sub(r"(?:网页采集|网页抓取|网页)", "", text)
+    text = re.sub(r"([（(])\s*[·•|/、,，-]+\s*", r"\1", text)
+    text = re.sub(r"\s*[·•|/、,，-]+\s*([）)])", r"\1", text)
+    text = re.sub(r"\s*[（(]\s*[）)]", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" ·/|-")
+    return text or "来源"
+
+
+def _source_links(
+    value: Any,
+    path: str,
+    *,
+    separator: str = "•",
+    clean_transport: bool = False,
+) -> str:
     """Render a canonical provenance registry without altering URL bytes."""
     if not isinstance(value, list) or not value:
         raise contracts.ContractError(f"{path} must contain at least one channel")
@@ -37,7 +56,11 @@ def _source_links(value: Any, path: str, *, separator: str = "•") -> str:
         if not isinstance(channel_value, Mapping):
             raise contracts.ContractError(f"{channel_path} must be an object")
         channel_id = channel_value.get("channel_id")
-        channel_label = _label(channel_value.get("channel_label"), f"{channel_path}.channel_label")
+        channel_label = (
+            _source_label(channel_value.get("channel_label"), f"{channel_path}.channel_label")
+            if clean_transport
+            else _label(channel_value.get("channel_label"), f"{channel_path}.channel_label")
+        )
         links = channel_value.get("links")
         if not isinstance(channel_id, str) or not channel_id:
             raise contracts.ContractError(f"{channel_path}.channel_id must be a string")
@@ -53,7 +76,11 @@ def _source_links(value: Any, path: str, *, separator: str = "•") -> str:
             if not isinstance(link_value, Mapping):
                 raise contracts.ContractError(f"{link_path} must be an object")
             role = link_value.get("role")
-            label = _label(link_value.get("label"), f"{link_path}.label")
+            label = (
+                _source_label(link_value.get("label"), f"{link_path}.label")
+                if clean_transport
+                else _label(link_value.get("label"), f"{link_path}.label")
+            )
             link_url = contracts.url(link_value.get("url"), f"{link_path}.url")
             if not isinstance(role, str) or not role:
                 raise contracts.ContractError(f"{link_path}.role must be a string")
@@ -83,6 +110,144 @@ def _source_links(value: Any, path: str, *, separator: str = "•") -> str:
     if omitted:
         result += f" +{omitted}"
     return result
+
+
+_SOURCE_LABEL_NOISE = re.compile(
+    r"(?:RSS|网页|网页动态|官网动态|官方动态|公众号|博客|Blog|Newsroom|News|官方报道|报道)",
+    re.IGNORECASE,
+)
+_SOURCE_TOKEN_STOPWORDS = {
+    "ai",
+    "the",
+    "one",
+    "useful",
+    "thing",
+    "official",
+    "news",
+    "newsroom",
+    "blog",
+    "x",
+}
+_GENERIC_SOURCE_LABELS = {
+    "原文",
+    "原始",
+    "原始报道",
+    "来源",
+    "article",
+    "direct source",
+    "link",
+    "original",
+    "source",
+}
+_SOCIAL_HOSTS = {"x.com", "twitter.com", "www.x.com", "www.twitter.com", "t.co"}
+
+
+def _compact_ai_source_label(value: Any, path: str) -> str:
+    """Return a short publisher label for the AI-ecosystem source row."""
+    text = _source_label(value, path)
+    # Transport/account qualifiers do not help a reader choose a source.
+    text = re.sub(r"\s*[（(][^）)]*[）)]", "", text)
+    text = re.sub(r"^\s*(?:X|Twitter)\s+", "", text, flags=re.IGNORECASE)
+    text = _SOURCE_LABEL_NOISE.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip(" ·•/-")
+    # Long English source names are usually an author plus a publication;
+    # the author is the compact, recognizable label for this report.
+    if len(text.split()) > 2 and re.search(r"[A-Za-z]", text):
+        text = " ".join(text.split()[:2])
+    return text or "来源"
+
+
+def _ai_source_tokens(label: str) -> set[str]:
+    tokens = re.findall(r"[a-z0-9]+|[\u3400-\u9fff]{2,}", label.lower())
+    return {token for token in tokens if token not in _SOURCE_TOKEN_STOPWORDS and len(token) > 1}
+
+
+def _ai_ecosystem_source_links(value: Any, path: str) -> str:
+    """Render a compact, reader-facing source row for AI ecosystem items.
+
+    AIHOT item pages remain in the validated provenance registry, but they are
+    an editorial intermediary rather than a useful reader-facing source. Show
+    original/direct links instead, deduplicate one publisher, prefer a direct
+    article over a social post from the same publisher, and cap the visible
+    row at two links.
+    """
+    if not isinstance(value, list) or not value:
+        raise contracts.ContractError(f"{path} must contain at least one channel")
+
+    candidates: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    sequence = 0
+    for channel_index, channel_value in enumerate(value):
+        channel_path = f"{path}[{channel_index}]"
+        if not isinstance(channel_value, Mapping):
+            raise contracts.ContractError(f"{channel_path} must be an object")
+        channel_id = channel_value.get("channel_id")
+        if not isinstance(channel_id, str) or not channel_id:
+            raise contracts.ContractError(f"{channel_path}.channel_id must be a string")
+        links = channel_value.get("links")
+        if not isinstance(links, list) or not links:
+            raise contracts.ContractError(f"{channel_path}.links must be a non-empty array")
+        for link_index, link_value in enumerate(links):
+            link_path = f"{channel_path}.links[{link_index}]"
+            if not isinstance(link_value, Mapping):
+                raise contracts.ContractError(f"{link_path} must be an object")
+            role = link_value.get("role")
+            link_url = contracts.url(link_value.get("url"), f"{link_path}.url")
+            if not isinstance(role, str) or not role:
+                raise contracts.ContractError(f"{link_path}.role must be a string")
+            if link_url in seen_urls:
+                continue
+            seen_urls.add(link_url)
+
+            # AIHOT item pages are intentionally hidden.  For AIHOT, only its
+            # original media link can be shown; other channels may expose a
+            # direct article link under their own native role.
+            if channel_id == "aihot" and role != "original":
+                continue
+            if channel_id != "aihot" and role not in {"original", "article", "source", "link"}:
+                continue
+            link_label = _compact_ai_source_label(
+                link_value.get("label", channel_value.get("channel_label", "来源")),
+                f"{link_path}.label",
+            )
+            channel_label = _compact_ai_source_label(
+                channel_value.get("channel_label", "来源"),
+                f"{channel_path}.channel_label",
+            )
+            label = (
+                channel_label
+                if link_label.casefold() in _GENERIC_SOURCE_LABELS
+                and channel_label.casefold() not in {"aihot", "来源"}
+                else link_label
+            )
+            host = (urlsplit(link_url).hostname or "").lower()
+            candidates.append(
+                {
+                    "label": label,
+                    "url": link_url,
+                    "tokens": _ai_source_tokens(label),
+                    "social": host in _SOCIAL_HOSTS,
+                    "sequence": sequence,
+                }
+            )
+            sequence += 1
+
+    if not candidates:
+        return "暂无可见原文"
+
+    # Prefer a direct article over a social post, while retaining source order
+    # among otherwise equivalent links.
+    candidates.sort(key=lambda item: (item["social"], item["sequence"]))
+    selected: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if any(candidate["tokens"] and candidate["tokens"] & chosen["tokens"] for chosen in selected):
+            continue
+        selected.append(candidate)
+        if len(selected) == 2:
+            break
+    if not selected:
+        selected = candidates[:1]
+    return "•".join(f"[{item['label']}]({item['url']})" for item in selected)
 
 
 def _english_title(value: str) -> bool:
@@ -125,8 +290,11 @@ def _render_agents(semantic: Mapping[str, Any]) -> str:
     sections = semantic["sections"]
     lines = ["📡 **agents-radar 生态报告 | " + semantic["date"] + "**", "", "**🤖 AI 生态动态**"]
     for index, item in enumerate(sections["ai_ecosystem"], 1):
-        source = _source_links(item["provenance"], f"sections.ai_ecosystem[{index - 1}].provenance", separator=" · ")
-        lines.append(f"- {_circled(index)} {_inline(item['summary'], f'sections.ai_ecosystem[{index - 1}].summary')}（来源：{source}）")
+        path = f"sections.ai_ecosystem[{index - 1}]"
+        topic = _inline(item["topic"], f"{path}.topic")
+        summary = _inline(item["summary"], f"{path}.summary")
+        source = _ai_ecosystem_source_links(item["provenance"], f"{path}.provenance")
+        lines.append(f"- {_circled(index)} **{topic}**：{summary}（来源：{source}）")
     # The Codex block is producer-owned.  Do not parse, normalize, or rebuild it.
     codex = sections["codexradar"]["markdown"]
     lines.extend(["", codex, "", "**🔥 开源热点趋势**"])

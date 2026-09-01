@@ -8,6 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -64,6 +65,29 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertIn("wire", assembled["source_errors"])
             with self.assertRaisesRegex(ValueError, "required source wire failed"):
                 adapters.validate_assembly_health(config, "noon-news", assembled)
+
+    def test_failed_render_retry_preserves_prepared_artifact(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            config = self._config(directory)
+            output = directory / "run"
+            output.mkdir()
+            prepared = output / "prepared.json"
+            prepared.write_text("{}\n", encoding="utf-8")
+            response = directory / "model-response.json"
+            response.write_text("not json\n", encoding="utf-8")
+            config_path = directory / "config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            args = mock.Mock(
+                output_dir=output,
+                config=config_path,
+                report="noon-news",
+                model_response=response,
+                date="2026-08-30",
+            )
+            with self.assertRaisesRegex(ValueError, "malformed model JSON"):
+                cli.run_pipeline(args, preserve_artifacts={"prepared.json"})
+            self.assertTrue(prepared.is_file())
 
     def test_section_minimum_candidates_is_enforced_before_model_payload(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -133,6 +157,85 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertNotIn("https://wire.test/1", payload_text)
             self.assertNotIn("provenance", payload_text)
             self.assertNotIn("published_at", payload_text)
+
+    def test_configured_text_url_stripping_preserves_candidate_and_trusted_source_link(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            config = self._config(directory)
+            source_path = directory / "noon.json"
+            source = json.loads(source_path.read_text(encoding="utf-8"))
+            source["items"][0]["summary"] = "International evidence https://unsafe.example/demo with context"
+            source_path.write_text(json.dumps(source), encoding="utf-8")
+            config["sources"]["wire"]["map"]["strip_urls_from_text"] = True
+            config["sources"]["wire"]["map"]["extra"]["description"] = "summary"
+
+            assembled = adapters.assemble_report(config, "noon-news", directory)
+            candidate_id = assembled["sections"]["international"][0]
+            candidate = assembled["candidate_registry"][candidate_id]
+            self.assertEqual(candidate["text"], "International evidence with context")
+            self.assertEqual(candidate["extra"]["description"], "International evidence with context")
+            self.assertEqual(
+                candidate["provenance"][0]["links"][0]["url"],
+                "https://wire.test/1",
+            )
+            payload = cli.build_model_payload("noon-news", assembled)
+            self.assertNotIn("unsafe.example", json.dumps(payload, ensure_ascii=False))
+
+    def test_strip_urls_from_text_must_be_boolean(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            config = self._config(directory)
+            config["sources"]["wire"]["map"]["strip_urls_from_text"] = "true"
+            with self.assertRaisesRegex(ValueError, "strip_urls_from_text must be a boolean"):
+                adapters.validate_config(config)
+
+    def test_source_exclude_is_applied_before_binding_take(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            config = self._config(directory)
+            source_path = directory / "noon.json"
+            source = json.loads(source_path.read_text(encoding="utf-8"))
+            source["items"] = [
+                {
+                    "title": "Blocked title",
+                    "summary": "Blocked evidence",
+                    "category": "business",
+                    "source": "GitHub Trending",
+                    "url": "https://wire.test/blocked",
+                },
+                {
+                    "title": "Allowed title",
+                    "summary": "Allowed evidence",
+                    "category": "business",
+                    "source": "Reuters",
+                    "url": "https://wire.test/allowed",
+                },
+            ]
+            source_path.write_text(json.dumps(source), encoding="utf-8")
+            config["sources"]["wire"]["exclude"] = {"source": ["GitHub Trending"]}
+            config["reports"]["noon-news"]["sections"]["macro_business"] = [
+                {"source": "wire", "match": {"category": ["business"]}, "take": 1}
+            ]
+
+            adapters.validate_config(config)
+            assembled = adapters.assemble_report(config, "noon-news", directory)
+
+            selected = assembled["sections"]["macro_business"]
+            self.assertEqual(len(selected), 1)
+            candidate = assembled["candidate_registry"][selected[0]]
+            self.assertEqual(candidate["title"], "Allowed title")
+            self.assertEqual(assembled["source_exclusions"], {"wire": 1})
+            self.assertNotIn("https://wire.test/blocked", adapters.source_urls(assembled))
+
+    def test_source_exclude_requires_non_empty_string_sets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            invalid_values = ({}, {"source": []}, {"source": [""]}, {"source": [1]}, {"": ["blocked"]})
+            for exclude in invalid_values:
+                config = self._config(directory)
+                config["sources"]["wire"]["exclude"] = exclude
+                with self.assertRaises(ValueError):
+                    adapters.validate_config(config)
 
     def test_unsafe_candidate_url_is_rejected_without_poisoning_source(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -206,6 +309,32 @@ class OfflinePipelineTests(unittest.TestCase):
     def _assembled(self, report):
         config = json.loads(self.CONFIG.read_text(encoding="utf-8"))
         return adapters.assemble_report(config, report, self.CONFIG.parent)
+
+    def _agent_descriptions(self, assembled):
+        open_metadata = assembled["metadata"]["open_source"]
+        names = [item["full_name"] for item in open_metadata["fresh_hot"]]
+        names.extend(category["projects"][0] for category in open_metadata["local_report_categories"])
+        by_name = {}
+        for cid in assembled["sections"]["open_source"]:
+            candidate = assembled["candidate_registry"][cid]
+            by_name[candidate["extra"]["full_name"]] = cid
+        return [
+            {"candidate_id": by_name[name], "description_zh": "用于 AI 工作流的工具。"}
+            for name in dict.fromkeys(names)
+        ]
+
+    def test_agents_payload_exposes_only_program_owned_display_ids(self):
+        assembled = self._assembled("agents-report")
+        payload = cli.build_model_payload("agents-report", assembled)
+        expected = [item["candidate_id"] for item in self._agent_descriptions(assembled)]
+        self.assertEqual(payload["open_source_display_ids"], expected)
+        self.assertTrue(set(payload["open_source_display_ids"]).issubset(set(assembled["sections"]["open_source"])))
+        hidden = set(assembled["sections"]["open_source"]) - set(expected)
+        self.assertTrue(hidden)
+        self.assertTrue(hidden.isdisjoint(set(payload["open_source_display_ids"])))
+        payload_text = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("stars_today", payload_text)
+        self.assertNotIn("provenance", payload_text)
 
     def _run(self, report, response, output):
         response_path = output.parent / f"{report}-response.json"
@@ -321,6 +450,31 @@ class OfflinePipelineTests(unittest.TestCase):
             manifest = json.loads((replayed / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "failed")
 
+    def test_model_response_inside_output_directory_survives_run_startup_cleanup(self):
+        assembled = self._assembled("noon-news")
+        ids = {key: values[0] for key, values in assembled["sections"].items()}
+        model = {
+            "top_points": [],
+            "sections": {
+                "international": [{"candidate_id": ids["international"], "summary": "国际合作发布联合说明。"}],
+                "macro_business": [{"candidate_id": ids["macro_business"], "summary": "企业发布季度经营说明。"}],
+                "ai": [{"candidate_id": ids["ai"], "summary": "智能体工具增加审计能力。"}],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "noon"
+            output.mkdir(parents=True)
+            response = output / "model-response.input.json"
+            response.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+            completed = subprocess.run(
+                [sys.executable, str(self.CLI), "run", "--config", str(self.CONFIG),
+                 "--report", "noon-news", "--output-dir", str(output),
+                 "--model-response", str(response), "--date", "2026-08-30"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue((output / "report.md").is_file())
+
     def test_model_output_size_is_hard_limited(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "noon"
@@ -373,11 +527,12 @@ class OfflinePipelineTests(unittest.TestCase):
         assembled = self._assembled("agents-report")
         ai_id = assembled["sections"]["ai_ecosystem"][0]
         model = {
-            "ai_ecosystem": [{"candidate_id": ai_id, "summary": "智能体生态增加可审计协作能力。"}],
+            "ai_ecosystem": [{"candidate_ids": [ai_id], "topic": "审计协作", "summary": "智能体生态增加可审计协作能力。"}],
             "open_source_trends": [
                 {"summary": "开源工具继续向可组合工作流整合。"},
                 {"summary": "社区基础设施更重视评测与本地部署。"},
             ],
+            "open_source_descriptions": self._agent_descriptions(assembled),
         }
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "agents"
@@ -388,12 +543,148 @@ class OfflinePipelineTests(unittest.TestCase):
             self.assertIn(codex, markdown)
             self.assertIn("**✨新热门开源**", markdown)
             self.assertIn("[fixture-labs/agent-workflow](https://github.com/fixture-labs/agent-workflow)", markdown)
+            self.assertIn("用于 AI 工作流的工具。", markdown)
+            self.assertNotIn("A composable agent workflow toolkit.", markdown)
             self.assertIn("① 🤖 AI 智能体/工作流", markdown)
             self.assertNotIn("其他项目", markdown)
             self.assertNotIn("\n---\n", markdown)
             payload = (output / "model-payload.json").read_text(encoding="utf-8")
             self.assertNotIn(codex, payload)
             self.assertNotIn("stars_today", payload)
+
+    def test_agent_handoff_renders_agents_from_prepared_artifacts_without_reloading_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "agents-handoff"
+            output.mkdir()
+            stale_response = output / "model-response.input.json"
+            stale_response.write_text('{"stale": true}', encoding="utf-8")
+            prepare_args = type("Args", (), {
+                "config": self.CONFIG,
+                "report": "agents-report",
+                "output_dir": output,
+                "date": "2026-08-31",
+                "model": "MiniMax-M3",
+                "provider": "minimax-cn",
+                "reasoning": "low",
+            })()
+            prepared_path = cli.prepare_pipeline(prepare_args)
+            self.assertEqual(prepared_path, output / "prepared.json")
+            self.assertFalse(stale_response.exists())
+            for name in ("assembled.json", "model-payload.json", "model-prompt.txt", "prepared.json"):
+                self.assertTrue((output / name).is_file(), name)
+            self.assertFalse((output / "report.md").exists())
+
+            assembled = json.loads((output / "assembled.json").read_text(encoding="utf-8"))
+            ai_id = assembled["sections"]["ai_ecosystem"][0]
+            response = output / "model-response.input.json"
+            response.write_text(json.dumps({
+                "ai_ecosystem": [{"candidate_ids": [ai_id], "topic": "审计协作", "summary": "智能体生态增加可审计协作能力。"}],
+                "open_source_trends": [
+                    {"summary": "开源工具继续向可组合工作流整合。"},
+                    {"summary": "社区基础设施更重视评测与本地部署。"},
+                ],
+                "open_source_descriptions": self._agent_descriptions(assembled),
+            }, ensure_ascii=False), encoding="utf-8")
+            render_args = type("Args", (), {
+                "config": self.CONFIG,
+                "output_dir": output,
+                "model_response": response,
+            })()
+            with mock.patch.object(adapters, "assemble_report", side_effect=AssertionError("sources reloaded")):
+                report_path = cli.render_prepared_pipeline(render_args)
+            self.assertEqual(report_path, output / "report.md")
+            self.assertIn("agents-radar 生态报告", report_path.read_text(encoding="utf-8"))
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "ok")
+            self.assertEqual(manifest["mode"], "agent-handoff")
+
+    def test_agent_handoff_rejects_tampered_prepared_assembly(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "agents-handoff"
+            prepare_args = type("Args", (), {
+                "config": self.CONFIG,
+                "report": "agents-report",
+                "output_dir": output,
+                "date": "2026-08-31",
+                "model": "MiniMax-M3",
+                "provider": "minimax-cn",
+                "reasoning": "low",
+            })()
+            cli.prepare_pipeline(prepare_args)
+            with (output / "assembled.json").open("a", encoding="utf-8") as handle:
+                handle.write(" ")
+            response = output / "model-response.input.json"
+            response.write_text("{}", encoding="utf-8")
+            render_args = type("Args", (), {
+                "config": self.CONFIG,
+                "output_dir": output,
+                "model_response": response,
+            })()
+            with self.assertRaisesRegex(ValueError, "prepared artifact hash mismatch for assembled.json"):
+                cli.render_prepared_pipeline(render_args)
+            self.assertFalse((output / "report.md").exists())
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "failed")
+
+    def test_agent_handoff_cli_prepare_and_render_prepared(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            prepare = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "glance_brief",
+                    "prepare",
+                    "--config",
+                    str(self.CONFIG),
+                    "--report",
+                    "agents-report",
+                    "--output-dir",
+                    str(run_dir),
+                    "--date",
+                    "2026-08-31",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(prepare.returncode, 0, prepare.stderr)
+            self.assertEqual(Path(prepare.stdout.strip()), run_dir / "prepared.json")
+
+            assembled = json.loads((run_dir / "assembled.json").read_text(encoding="utf-8"))
+            ai_id = assembled["sections"]["ai_ecosystem"][0]
+            semantic = {
+                "ai_ecosystem": [{"candidate_ids": [ai_id], "topic": "版本发布", "summary": "Release candidate is available."}],
+                "open_source_trends": [
+                    {"summary": "智能体工具持续走向专业工作流。"},
+                    {"summary": "本地部署与自动化协作获得更多关注。"},
+                ],
+                "open_source_descriptions": self._agent_descriptions(assembled),
+            }
+            response_path = run_dir / "model-response.input.json"
+            response_path.write_text(json.dumps(semantic, ensure_ascii=False), encoding="utf-8")
+            render = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "glance_brief",
+                    "render-prepared",
+                    "--config",
+                    str(self.CONFIG),
+                    "--output-dir",
+                    str(run_dir),
+                    "--model-response",
+                    str(response_path),
+                    "--stdout-report",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
+            self.assertEqual(render.stdout, (run_dir / "report.md").read_text(encoding="utf-8"))
 
     def test_invalid_model_response_keeps_failure_evidence_without_report(self):
         with tempfile.TemporaryDirectory() as temp:

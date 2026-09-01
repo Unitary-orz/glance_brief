@@ -39,6 +39,19 @@ class FormalInstallerTests(unittest.TestCase):
         target.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return target
 
+    def _agent_descriptions(self, assembled):
+        open_metadata = assembled["metadata"]["open_source"]
+        names = [item["full_name"] for item in open_metadata["fresh_hot"]]
+        names.extend(category["projects"][0] for category in open_metadata["local_report_categories"])
+        by_name = {}
+        for cid in assembled["sections"]["open_source"]:
+            candidate = assembled["candidate_registry"][cid]
+            by_name[candidate["extra"]["full_name"]] = cid
+        return [
+            {"candidate_id": by_name[name], "description_zh": "用于 AI 工作流的工具。"}
+            for name in dict.fromkeys(names)
+        ]
+
     def test_verify_requires_runtime_config_before_job_is_runnable(self):
         with TemporaryDirectory() as temp:
             home = Path(temp)
@@ -217,7 +230,8 @@ class FormalInstallerTests(unittest.TestCase):
                 },
             },
             "agents-report": {
-                "ai_ecosystem": [{"candidate_id": ai_id, "summary": "智能体生态增加可审计协作能力。"}],
+                "ai_ecosystem": [{"candidate_ids": [ai_id], "topic": "审计协作", "summary": "智能体生态增加可审计协作能力。"}],
+                "open_source_descriptions": self._agent_descriptions(agents_assembled),
                 "open_source_trends": [
                     {"summary": "开源工具继续向可组合工作流整合。"},
                     {"summary": "社区基础设施更重视评测与本地部署。"},

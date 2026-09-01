@@ -49,6 +49,28 @@ Before scheduler wiring, the installing Agent must create a real schema 2
 `data/glance-brief/config/brief.json`. The installed example points at repository
 fixtures and is not a live configuration.
 
+## Hermes: isolated agent-mode semantic handoff
+
+The same core also supports an outer Cron Agent that owns the one semantic model
+turn without generating final Markdown or nesting `hermes chat` in a script:
+
+```text
+glance_brief prepare
+→ prepared.json + immutable assembled/payload/prompt hashes
+→ Cron Agent writes run-scoped semantic JSON
+→ glance_brief render-prepared
+→ resolver + deterministic report.md
+```
+
+`prepare` reads each source once. `render-prepared` verifies the config and
+prepared artifact hashes, then renders from the saved registry without reading
+sources again. A runtime wrapper may add model/provider usage metadata, but the
+shared CLI does not select a Hermes provider.
+
+This mode is intended for isolated Preview/Shadow Cron validation first. Adding a
+Preview does not authorize replacing the installed `no_agent: true` jobs or the
+formal Cron definitions; production cutover remains a separate change.
+
 ## OpenClaw: contract only in v0.3.0
 
 No verified OpenClaw model adapter is shipped. `adapters/openclaw/jobs.example.json`

@@ -3,10 +3,15 @@
 ## 0.3.0 — 2026-08-31
 
 - 仓库、Skill 与公开文档统一为 glance_brief v0.3.0；共享 pipeline 晋升为顶层正式 `glance_brief` 包与统一 CLI，不保留实验目录或双发布线。
-- 引入 bounded adapters、immutable candidate registry、lean semantic payload、resolver、strict validator 与 deterministic renderer；模型只负责候选选择、单候选摘要、中文对照翻译和总体趋势。
+- 引入 bounded adapters、immutable candidate registry、lean semantic payload、resolver、strict validator 与 deterministic renderer；模型只负责候选选择、多候选语义摘要、中文对照翻译和总体趋势。
 - 增加 required、minimum candidates、selection limits、unsafe candidate rejection、manifest、SHA-256 replay 与 tamper rejection 门禁。
 - 移除 legacy converter、legacy fixtures、legacy tests 和多协议运行分支；失败时保留诊断与 failed manifest，不生成 `report.md`。
 - 统一 noon-news 的英文标题中文对照规则，并保持原题、事实句与来源引用三行分离。
+- 增加 `prepare` / `render-prepared` 的 Cron-native semantic handoff：模型只写 run-scoped JSON，resolver 从已哈希的 prepared registry 恢复事实并确定性渲染，不重复读取来源。
+- 增加配置驱动的 `map.strip_urls_from_text`，清理候选正文和 description 中的内嵌 URL，同时保留独立可信 provenance 链接。
+- Agents semantic contract 增加 `open_source_descriptions`：模型只翻译程序已确定展示的项目简介，项目身份、URL、Star、fresh 和分类继续由程序锁定。
+- Agents AI 生态动态改为 `candidate_ids` 多候选绑定，增加短 `topic` 导语和更高密度摘要约束；resolver 合并候选 provenance、禁止重复引用，并在 AI 来源展示中隐藏 RSS/网页等传输标签。
+- Agents AI 生态编辑改为“最多三条生态变化切片”：先按事件/进展/互补主题聚类，优先覆盖不同生态维度和至少五个候选事实；resolver 对候选池较大但摘要覆盖不足的情况记录 warning。
 
 ## 0.2.3 — 2026-08-25
 

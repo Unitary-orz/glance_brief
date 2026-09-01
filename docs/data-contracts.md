@@ -67,7 +67,8 @@ aihot
 
 - `json_file`；
 - 受限 `command_json`：argv 数组、timeout、受控 cwd、基础环境和显式 `env_allowlist`；
-- `map`：title、text、published_at、extra、links；
+- `map`：title、text、published_at、extra、links；可选 `strip_urls_from_text: true` 只清理正文与 `extra.description` 中的 URL，provenance links 仍从独立字段保留；
+- 可选 `exclude`：按原始记录的稳定字段路径做精确字符串集合过滤；在候选构造和 binding `take` 之前执行，过滤命中数写入 assembled diagnostics；
 - `required`：必选来源失败时在模型调用前 hard fail；
 - `minimum_candidates`：板块候选下限；
 - Noon `selection_limits`：最终选择数量的 min/max；
@@ -103,7 +104,8 @@ candidate_id
 - candidate ID；
 - 标题和证据文本；
 - 报告语义所需的受限 extra；
-- section 与 selection limits。
+- section 与 selection limits；
+- 程序已经确定要展示的 `open_source_display_ids`，仅包含 candidate ID。
 
 模型不得看到 URL、provenance、来源 metadata、日期、项目指标、Codex Markdown 或最终 Markdown 骨架。payload 出现 URL 时必须 fail closed。
 
@@ -116,7 +118,7 @@ candidate_id
 - 项目身份、描述、指标、fresh 和分类；
 - producer-owned Codex block。
 
-模型字段只允许进入摘要、英文标题中文对照、主题和总体趋势。数字只能做等值格式规范化，不能换算币种、单位、比例或数量级。
+AI 动态模型字段为 `candidate_ids`、`topic` 和 `summary`：先将候选按事件、进展或明确互补主题聚类，再选择最多三条生态变化切片；每条绑定 1–3 个候选，候选池达到 5 条时默认争取覆盖至少 5 个候选 ID，全文不得复用候选 ID；摘要数字必须由绑定候选证据的并集支持。`topic` 是短导语，`summary` 不超过 140 字，并拒绝 RSS/feed/网页采集等来源管线词。模型还可写英文标题中文对照、项目简介中文翻译、主题和总体趋势。`open_source_descriptions` 必须逐个覆盖 `open_source_display_ids`，简介只能根据对应候选 `text` 翻译；数字只能逐字保留来源支持的内容，不能换算币种、单位、比例或数量级。项目身份、URL、Star、fresh 和分类不由模型提供。
 
 ## 失败与 artifacts
 

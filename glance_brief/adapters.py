@@ -31,8 +31,9 @@ _SOURCE_FIELDS = {
     "snapshot",
     "required",
     "env_allowlist",
+    "exclude",
 }
-_MAP_FIELDS = {"title", "text", "published_at", "extra", "links"}
+_MAP_FIELDS = {"title", "text", "published_at", "extra", "links", "strip_urls_from_text"}
 _SNAPSHOT_FIELDS = {"fresh_hot", "local_report_categories", "quality", "markdown", "new_projects"}
 
 
@@ -77,6 +78,10 @@ def _label(value: Any, path: str) -> str:
     text = " ".join(value.split())
     text = text.replace("：", " ").replace(":", " ")
     return " ".join(text.split())
+
+
+def _strip_urls(value: str) -> str:
+    return " ".join(re.sub(r"https?://[^\s<>()]+", "", value, flags=re.I).split())
 
 
 def candidate_id_for(candidate: Mapping[str, Any]) -> str:
@@ -138,6 +143,8 @@ def normalize_candidate(source_id: str, source: Mapping[str, Any], raw: Mapping[
         text = ""
     if not isinstance(title, str) or not isinstance(text, str):
         raise contracts.ContractError("candidate title and text must be strings")
+    if mapping.get("strip_urls_from_text") is True:
+        text = _strip_urls(text)
     if not title.strip() and not text.strip():
         raise contracts.ContractError("candidate needs title or text")
     if re.search(r"https?://", title, re.I) or re.search(r"https?://", text, re.I):
@@ -160,6 +167,8 @@ def normalize_candidate(source_id: str, source: Mapping[str, Any], raw: Mapping[
         value = _pick(raw, spec, f"map.extra.{name}")
         if value is not None:
             extra[name] = value
+    if mapping.get("strip_urls_from_text") is True and isinstance(extra.get("description"), str):
+        extra["description"] = _strip_urls(extra["description"])
     channel_id = source.get("channel_id", source_id)
     channel_label = source.get("channel_label", source_id)
     if not isinstance(channel_id, str) or not channel_id:
@@ -178,6 +187,21 @@ def normalize_candidate(source_id: str, source: Mapping[str, Any], raw: Mapping[
     }
     candidate["candidate_id"] = candidate_id_for(candidate)
     return candidate
+
+
+def _validate_exclude(source_id: str, exclude: Any) -> None:
+    path = f"sources.{source_id}.exclude"
+    if not isinstance(exclude, Mapping) or not exclude:
+        raise contracts.ContractError(f"{path} must be a non-empty object")
+    for field, values in exclude.items():
+        if not isinstance(field, str) or not field.strip():
+            raise contracts.ContractError(f"{path} keys must be non-empty field paths")
+        if not isinstance(values, list) or not values or any(
+            not isinstance(value, str) or not value for value in values
+        ):
+            raise contracts.ContractError(f"{path}.{field} must be a non-empty string array")
+        if len(set(values)) != len(values):
+            raise contracts.ContractError(f"{path}.{field} must not contain duplicates")
 
 
 def _validate_source(source_id: str, source: Any) -> None:
@@ -215,12 +239,16 @@ def _validate_source(source_id: str, source: Any) -> None:
             raise contracts.ContractError(f"sources.{source_id}.timeout must be positive")
     if "required" in source and not isinstance(source["required"], bool):
         raise contracts.ContractError(f"sources.{source_id}.required must be a boolean")
+    if "exclude" in source:
+        _validate_exclude(source_id, source["exclude"])
     mapping = source.get("map")
     if not isinstance(mapping, Mapping):
         raise contracts.ContractError(f"sources.{source_id}.map must be an object")
     unknown_map = set(mapping) - _MAP_FIELDS
     if unknown_map:
         raise contracts.ContractError(f"sources.{source_id}.map has unknown fields: {sorted(unknown_map)!r}")
+    if "strip_urls_from_text" in mapping and not isinstance(mapping["strip_urls_from_text"], bool):
+        raise contracts.ContractError(f"sources.{source_id}.map.strip_urls_from_text must be a boolean")
     for name in ("title", "text", "published_at"):
         if name in mapping:
             _specs(mapping[name], f"sources.{source_id}.map.{name}")
@@ -381,6 +409,13 @@ def _items(payload: Any, source: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [item for item in value if isinstance(item, Mapping)]
 
 
+def _is_excluded(raw: Mapping[str, Any], source: Mapping[str, Any]) -> bool:
+    return any(
+        get_path(raw, field, None) in values
+        for field, values in source.get("exclude", {}).items()
+    )
+
+
 def _snapshot(payload: Any, source: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name, spec in source.get("snapshot", {}).items():
@@ -433,6 +468,7 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
     snapshots: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
     rejections: dict[str, list[dict[str, Any]]] = {}
+    exclusions: dict[str, int] = {}
     for source_id in referenced:
         source = config["sources"][source_id]
         try:
@@ -440,11 +476,17 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
             snapshots[source_id] = _snapshot(payload, source)
             normalized: list[dict[str, Any]] = []
             source_rejections: list[dict[str, Any]] = []
+            source_exclusions = 0
             for index, raw in enumerate(_items(payload, source)):
+                if _is_excluded(raw, source):
+                    source_exclusions += 1
+                    continue
                 try:
                     normalized.append(normalize_candidate(source_id, source, raw))
                 except contracts.ContractError as exc:
                     source_rejections.append({"index": index, "error": str(exc)})
+            if source_exclusions:
+                exclusions[source_id] = source_exclusions
             loaded[source_id] = normalized
             if source_rejections:
                 rejections[source_id] = source_rejections
@@ -498,6 +540,8 @@ def assemble_report(config: Mapping[str, Any], report_id: str, config_dir: Path 
         result["selection_limits"] = copy.deepcopy(report["selection_limits"])
     if errors:
         result["source_errors"] = errors
+    if exclusions:
+        result["source_exclusions"] = exclusions
     if rejections:
         result["candidate_rejections"] = rejections
     return result
