@@ -42,7 +42,8 @@ generated_at
 - AI HOT 条目链接、来源和分类取自原始字段；
 - CodexRadar Markdown 是 producer-owned block，验证后逐字插入；
 - 开源雷达必须提供 `quality.ok`、`hot_today`、`fresh_hot`、`local_report_categories`；
-- `fresh_hot` 是 `hot_today` 的唯一子集，分类唯一完整覆盖 hot；
+- `fresh_hot` 是 `hot_today` 的唯一子集，分类唯一完整覆盖 hot；最终报告的每个 `fresh_hot` 项目还携带其程序确定的分类标签，分类榜仍可重复展示该项目；
+- Star 展示统一使用 `stars_today`（GitHub Trending 原始日增量）；`stars_delta` 仅用于本地快照差值和排序，不得渲染为 `★/日`；
 - GitHub URL 必须与 `owner/repo` 身份一致。
 
 ### noon-news 来源

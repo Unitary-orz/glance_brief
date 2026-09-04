@@ -400,7 +400,12 @@ class AgentsCurrentContractTests(unittest.TestCase):
             "title": name,
             "text": description,
             "published_at": None,
-            "extra": {"kind": "project", "stars_today": stars, "is_fresh_hot": fresh},
+            "extra": {
+                "kind": "project",
+                "stars_today": stars,
+                "stars_delta": stars + 1000,
+                "is_fresh_hot": fresh,
+            },
             "provenance": [
                 {
                     "channel_id": "github",
@@ -438,7 +443,7 @@ class AgentsCurrentContractTests(unittest.TestCase):
                     "hot_today": [alpha, beta, gamma],
                     "fresh_hot": [alpha],
                     "local_report_categories": [
-                        {"title": "Agent 工具", "projects": ["acme/alpha"]},
+                        {"title": "🤖 Agent 工具", "projects": ["acme/alpha"]},
                         {"title": "评测基础设施", "projects": ["acme/beta", "acme/gamma"]},
                     ],
                     "quality": {"ok": True, "alpha": "accepted"},
@@ -469,7 +474,8 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["name"], "acme/alpha")
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["url"], "https://github.com/acme/alpha")
         self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["description"], "用于构建紧凑型智能体运行时。")
-        self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["title"], "Agent 工具")
+        self.assertEqual(resolved["sections"]["open_source"]["fresh_hot"][0]["category"], "🤖 Agent 工具")
+        self.assertEqual(resolved["sections"]["open_source"]["categories"][0]["title"], "🤖 Agent 工具")
         self.assertEqual([project["name"] for project in resolved["sections"]["open_source"]["categories"][0]["projects"]], ["acme/alpha"])
         self.assertEqual(
             [project["name"] for project in resolved["sections"]["open_source"]["categories"][1]["projects"]],
@@ -487,10 +493,10 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertIn("**✨新热门开源**", markdown)
         self.assertIn("- ① 生态协作：AI 生态出现新的协作信号。", markdown)
         self.assertIn("- ① 开源工具继续向更轻量的工作流整合。", markdown)
-        self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
+        self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)（Agent 工具）", markdown)
         self.assertLess(markdown.index("**✨新热门开源**"), markdown.index("📦**最热门开源**"))
-        self.assertLess(markdown.index("📦**最热门开源**"), markdown.index("① Agent 工具"))
-        self.assertIn("① Agent 工具", markdown)
+        self.assertLess(markdown.index("📦**最热门开源**"), markdown.index("① 🤖 Agent 工具"))
+        self.assertIn("① 🤖 Agent 工具", markdown)
         self.assertIn("- ✨ [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)", markdown)
         self.assertIn(
             "- [acme/beta](https://github.com/acme/beta)「用于本地 AI 系统的实用评测工具包。」(+17★/日) · "

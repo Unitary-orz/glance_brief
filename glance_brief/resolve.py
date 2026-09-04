@@ -391,7 +391,13 @@ def resolve_report(
     raise contracts.ContractError(f"unsupported report {report_id!r}")
 
 
-def _project_candidate(candidate: Mapping[str, Any], fresh: bool, path: str) -> dict[str, Any]:
+def _project_candidate(
+    candidate: Mapping[str, Any],
+    fresh: bool,
+    path: str,
+    *,
+    category: str | None = None,
+) -> dict[str, Any]:
     extra = candidate.get("extra", {})
     if not isinstance(extra, Mapping):
         raise contracts.ContractError(f"{path} candidate extra must be an object")
@@ -420,13 +426,18 @@ def _project_candidate(candidate: Mapping[str, Any], fresh: bool, path: str) -> 
     contracts.url(repository, f"{path}.url")
     if (urlsplit(repository).hostname or "").casefold() not in {"github.com", "www.github.com"}:
         raise contracts.ContractError(f"{path} project URL must use the GitHub host")
-    return {
+    project = {
         "name": name,
         "url": repository,
         "description": description,
         "stars_today": stars,
         "is_fresh_hot": bool(fresh),
     }
+    if fresh:
+        if not isinstance(category, str) or not category.strip():
+            raise contracts.ContractError(f"{path}.category is required for fresh_hot projects")
+        project["category"] = category
+    return project
 
 
 def _metric_safety(value: Any, path: str) -> None:
@@ -600,15 +611,7 @@ def resolve_agents(
     if len(set(fresh_ids)) != len(fresh_ids) or not set(fresh_ids).issubset(set(hot_ids)):
         raise contracts.ContractError("fresh_hot must be a unique subset of hot_today")
     fresh_set = set(fresh_ids)
-    project_tokens: set[str] = set()
-    project_cache: dict[str, dict[str, Any]] = {}
-    for cid, candidate in by_id.items():
-        project = _project_candidate(candidate, cid in fresh_set, f"candidate_registry.{cid}")
-        project_cache[cid] = project
-        name = project["name"].casefold()
-        project_tokens.add(name)
-        if "/" in name:
-            project_tokens.update(part for part in name.split("/") if len(part) >= 3)
+
     categories_value = open_metadata.get("local_report_categories", [])
     parsed_categories = _category_rows(categories_value, "metadata.open_source.local_report_categories")
     resolved_category_ids: list[list[str]] = []
@@ -631,6 +634,26 @@ def resolve_agents(
         raise contracts.ContractError("category mapping must contain unique projects without duplicates")
     if set(flattened_category_ids) != set(hot_ids):
         raise contracts.ContractError("category mapping must completely cover hot_today")
+    category_by_id = {
+        cid: title
+        for (title, _refs), category_ids in zip(parsed_categories, resolved_category_ids)
+        for cid in category_ids
+    }
+
+    project_tokens: set[str] = set()
+    project_cache: dict[str, dict[str, Any]] = {}
+    for cid, candidate in by_id.items():
+        project = _project_candidate(
+            candidate,
+            cid in fresh_set,
+            f"candidate_registry.{cid}",
+            category=category_by_id.get(cid),
+        )
+        project_cache[cid] = project
+        name = project["name"].casefold()
+        project_tokens.add(name)
+        if "/" in name:
+            project_tokens.update(part for part in name.split("/") if len(part) >= 3)
     category_rows: list[dict[str, Any]] = []
     displayed_ids = set(displayed_open_source_ids(assembled))
     category_titles: list[str] = []
@@ -676,9 +699,14 @@ def resolve_agents(
         project_cache[cid]["description"] = description
     for index, title in enumerate(category_titles):
         category_ids = resolved_category_ids[index][:3]
+        category_projects = []
+        for cid in category_ids:
+            category_project = copy.deepcopy(project_cache[cid])
+            category_project.pop("category", None)
+            category_projects.append(category_project)
         category_rows.append({
             "title": title,
-            "projects": [copy.deepcopy(project_cache[cid]) for cid in category_ids],
+            "projects": category_projects,
         })
 
     quality = copy.deepcopy(open_metadata.get("quality", {}))

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Any
@@ -25,6 +26,18 @@ def _label(value: Any, path: str) -> str:
     text = _inline(value, path)
     text = re.sub(r"\s*[:：]\s*", " ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _category_suffix(value: Any, path: str) -> str:
+    """Render the category text without a leading category icon."""
+    text = _inline(value, path).lstrip()
+    while text:
+        first = text[0]
+        if first in "\ufe0f\u200d" or unicodedata.category(first) in {"So", "Sk"}:
+            text = text[1:].lstrip()
+            continue
+        break
+    return text or "分类"
 
 
 def _source_label(value: Any, path: str) -> str:
@@ -84,6 +97,8 @@ def _source_links(
             link_url = contracts.url(link_value.get("url"), f"{link_path}.url")
             if not isinstance(role, str) or not role:
                 raise contracts.ContractError(f"{link_path}.role must be a string")
+            if role in {"original", "article", "source", "link"}:
+                label = _original_publisher_label(label, link_url)
             if link_url in seen_urls:
                 continue
             seen_urls.add(link_url)
@@ -140,6 +155,27 @@ _GENERIC_SOURCE_LABELS = {
     "source",
 }
 _SOCIAL_HOSTS = {"x.com", "twitter.com", "www.x.com", "www.twitter.com", "t.co"}
+_INTERMEDIARY_SOURCE_LABEL = re.compile(r"(?:\bHacker(?:\s+News)?\b|buzzing\.cc|新闻聚合|聚合来源|热门)", re.IGNORECASE)
+_INTERMEDIARY_HOSTS = {"news.ycombinator.com", "buzzing.cc", "www.buzzing.cc", "aihot.virxact.com"}
+
+
+def _publisher_label_from_host(host: str) -> str:
+    """Derive a conservative publisher label from a verified original URL."""
+    parts = host.removeprefix("www.").split(".")
+    if len(parts) >= 3 and ".".join(parts[-2:]) in {"co.uk", "com.au", "co.jp"}:
+        stem = parts[-3]
+    else:
+        stem = parts[-2] if len(parts) >= 2 else parts[0]
+    words = stem.replace("-", " ").split()
+    return " ".join(word.upper() if word.isascii() and word.isalpha() and len(word) <= 5 else word.title() for word in words)
+
+
+def _original_publisher_label(label: str, link_url: str) -> str:
+    """Do not present an intermediary discovery label as the publisher."""
+    host = (urlsplit(link_url).hostname or "").lower()
+    if host and host not in _INTERMEDIARY_HOSTS and _INTERMEDIARY_SOURCE_LABEL.search(label):
+        return _publisher_label_from_host(host)
+    return label
 
 
 def _compact_ai_source_label(value: Any, path: str) -> str:
@@ -306,7 +342,11 @@ def _render_agents(semantic: Mapping[str, Any]) -> str:
         for index, project in enumerate(open_source["fresh_hot"]):
             description = _inline(project["description"], f"sections.open_source.fresh_hot[{index}].description", allow_empty=True)
             suffix = f"「{description}」" if description else ""
-            lines.append(f"- {_project_link(project, f'sections.open_source.fresh_hot[{index}]')}{suffix}(+{project['stars_today']}★/日)")
+            category = _category_suffix(project["category"], f"sections.open_source.fresh_hot[{index}].category")
+            lines.append(
+                f"- {_project_link(project, f'sections.open_source.fresh_hot[{index}]')}{suffix}"
+                f"(+{project['stars_today']}★/日)（{category}）"
+            )
     lines.extend(["", "📦**最热门开源**"])
     for index, category in enumerate(open_source["categories"], 1):
         lines.extend(["", f"{_circled(index)} {_inline(category['title'], f'sections.open_source.categories[{index - 1}].title')}"])

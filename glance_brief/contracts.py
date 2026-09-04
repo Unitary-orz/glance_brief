@@ -262,11 +262,22 @@ def _validate_noon(value: Mapping[str, Any]) -> None:
         raise ContractError("top_points must reference selected details")
 
 
-def _validate_project(value: Any, path: str, *, require_fresh: bool = True) -> None:
+def _validate_project(
+    value: Any,
+    path: str,
+    *,
+    require_fresh: bool = True,
+    require_category: bool = False,
+) -> None:
     project = _require_mapping(value, path)
-    allowed = {"name", "url", "description", "stars_today", "is_fresh_hot"}
+    allowed = {"name", "url", "description", "stars_today", "is_fresh_hot", "category"}
     _only_keys(project, allowed, path)
-    _required(project, {"name", "url", "description", "stars_today"} | ({"is_fresh_hot"} if require_fresh else set()), path)
+    required = {"name", "url", "description", "stars_today"}
+    if require_fresh:
+        required.add("is_fresh_hot")
+    if require_category:
+        required.add("category")
+    _required(project, required, path)
     safe_text(project["name"], f"{path}.name")
     url(project["url"], f"{path}.url")
     safe_text(project["description"], f"{path}.description", allow_empty=True)
@@ -275,6 +286,8 @@ def _validate_project(value: Any, path: str, *, require_fresh: bool = True) -> N
         raise ContractError(f"{path}.stars_today must be an integer")
     if require_fresh and not isinstance(project["is_fresh_hot"], bool):
         raise ContractError(f"{path}.is_fresh_hot must be boolean")
+    if "category" in project:
+        safe_text(project["category"], f"{path}.category")
 
 
 def validate_codex_markdown(value: Any, path: str = "codexradar.markdown") -> None:
@@ -332,7 +345,11 @@ def _validate_agents(value: Mapping[str, Any]) -> None:
         safe_text(trend, f"resolved.sections.open_source.trends[{index}]")
     fresh = _require_list(source["fresh_hot"], "resolved.sections.open_source.fresh_hot")
     for index, project in enumerate(fresh):
-        _validate_project(project, f"resolved.sections.open_source.fresh_hot[{index}]")
+        _validate_project(
+            project,
+            f"resolved.sections.open_source.fresh_hot[{index}]",
+            require_category=True,
+        )
     categories = _require_list(source["categories"], "resolved.sections.open_source.categories")
     for index, category_value in enumerate(categories):
         path = f"resolved.sections.open_source.categories[{index}]"
