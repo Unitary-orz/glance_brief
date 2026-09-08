@@ -133,6 +133,7 @@ def main() -> int:
         "quality": quality,
         "signals": signals,
         "categories": categories,
+        "category_definitions": report.get("category_definitions", []),
         "local_report_categories": local_report_categories,
         "instructions": report.get("instructions", ""),
     }

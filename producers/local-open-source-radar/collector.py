@@ -296,7 +296,11 @@ def _age_days(created_at: Any, report_date: date) -> int | None:
 
 
 def rank_candidates(
-    candidates: list[dict[str, Any]], config: dict[str, Any], report_date: date
+    candidates: list[dict[str, Any]],
+    config: dict[str, Any],
+    report_date: date,
+    *,
+    apply_cap: bool = True,
 ) -> list[dict[str, Any]]:
     weights = config["ranking"]
     for item in candidates:
@@ -314,7 +318,7 @@ def rank_candidates(
             score += float(weights["new_repo_bonus"])
         item["repo_age_days"] = age
         item["score"] = round(score, 2)
-    return sorted(
+    ranked = sorted(
         candidates,
         key=lambda item: (
             -float(item.get("score", 0)),
@@ -323,7 +327,24 @@ def rank_candidates(
             -int(item.get("stars_total", 0) or 0),
             str(item.get("full_name", "")).lower(),
         ),
-    )[: int(weights["max_candidates"])]
+    )
+    return ranked[: int(weights["max_candidates"])] if apply_cap else ranked
+
+
+def _category_score(item: dict[str, Any], category: dict[str, Any]) -> int:
+    """Score a legacy category hint with specific phrases outweighing generic terms."""
+    blob = _text_blob(item)
+    strong_keywords = category.get("strong_keywords", [])
+    keywords = category.get("keywords", [])
+    strong_score = sum(
+        3 for keyword in strong_keywords
+        if _contains_keyword(blob, str(keyword))
+    )
+    ordinary_score = sum(
+        1 for keyword in keywords
+        if _contains_keyword(blob, str(keyword))
+    )
+    return strong_score + ordinary_score
 
 
 def categorize(
@@ -342,11 +363,10 @@ def categorize(
         else max(0, int(max_per_category))
     )
     for item in candidates:
-        blob = _text_blob(item)
         label = fallback
         best = 0
         for category in categories:
-            score = sum(1 for keyword in category["keywords"] if keyword.lower() in blob)
+            score = _category_score(item, category)
             if score > best:
                 best = score
                 label = category["label"]
@@ -879,11 +899,21 @@ def build_output(
     *,
     prior_seen_names: set[str] | None = None,
     prior_new_project_names: set[str] | None = None,
+    pool_ranked: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     output_cfg = config["output"]
-    hot = [item for item in ranked if "github-trending" in item.get("sources", [])]
-    new = [item for item in ranked if any(str(s).startswith("new:") for s in item.get("sources", []))]
-    hot_today = [dict(item) for item in hot[: int(output_cfg["top_hot"])]]
+    # ``ranked`` is the bounded artifact/model budget.  Signal sections must
+    # instead select from the complete ranked pool, otherwise one signal can
+    # silently hide another before its own cap is applied.
+    selection_pool = ranked if pool_ranked is None else pool_ranked
+    hot = [item for item in selection_pool if "github-trending" in item.get("sources", [])]
+    new = [
+        item
+        for item in selection_pool
+        if any(str(s).startswith("new:") for s in item.get("sources", []))
+    ]
+    hot_limit = int(output_cfg["top_hot"])
+    hot_today = [dict(item) for item in hot[:hot_limit]]
     # ``fresh_hot`` is a highlighted subset of the expanded hot list.  Keep
     # freshness selection inside ``hot_today`` so the report can show fresh
     # projects first and mark the same projects in their normal hot-rank rows.
@@ -902,11 +932,43 @@ def build_output(
         str(item.get("full_name", ""))
         for item in [*hot_today, *fresh_hot]
     }
-    new_projects = [
+    prior_new_names = prior_new_project_names or set()
+    new_after_history = [
         item for item in new
-        if str(item.get("full_name", "")) not in (prior_new_project_names or set())
-        and str(item.get("full_name", "")) not in current_section_names
-    ][: int(output_cfg["top_new"])]
+        if str(item.get("full_name", "")) not in prior_new_names
+    ]
+    new_after_same_report = [
+        item
+        for item in new_after_history
+        if str(item.get("full_name", "")) not in current_section_names
+    ]
+    new_limit = int(output_cfg["top_new"])
+    new_projects = new_after_same_report[:new_limit]
+    selection_diagnostics = {
+        "artifact_ranked_count": len(ranked),
+        "full_selection_pool_count": len(selection_pool),
+        "hot": {
+            "eligible_count": len(hot),
+            "selected_count": len(hot_today),
+            "lost_to_cap": max(0, len(hot) - hot_limit),
+        },
+        "fresh_hot": {
+            "eligible_count": sum(
+                1
+                for item in hot_today
+                if str(item.get("full_name", "")) not in (prior_seen_names or set())
+            ),
+            "selected_count": len(fresh_hot),
+        },
+        "discovery": {
+            "eligible_count": len(new),
+            "after_history_count": len(new_after_history),
+            "after_same_report_count": len(new_after_same_report),
+            "selected_count": len(new_projects),
+            "lost_to_cap": max(0, len(new_after_same_report) - new_limit),
+        },
+    }
+    diagnostics = {**diagnostics, "selection": selection_diagnostics}
     quality = validate_candidates(ranked)
     return {
         "schema_version": 1,
@@ -919,11 +981,22 @@ def build_output(
             "new_projects": new_projects,
             "fresh_hot": fresh_hot,
         },
+        # This mapping remains a deterministic hint for legacy consumers. The
+        # standalone radar editor classifies from project evidence instead.
         "categories": categorize(
             hot_today,
             config,
             max_per_category=len(hot_today),
         ),
+        "category_definitions": [
+            {
+                "id": category.get("id"),
+                "label": category.get("label"),
+                "semantic_scope": category.get("semantic_scope", ""),
+                "semantic_exclusions": category.get("semantic_exclusions", []),
+            }
+            for category in config.get("categories", [])
+        ],
         "candidates": ranked,
         "instructions": (
             "只基于这些结构化 GitHub 数据生成开源热点趋势；stars_today 来自 GitHub Trending，"
@@ -965,7 +1038,8 @@ def main() -> int:
     validate_source_health(trending, searched, config)
     merged, next_state = merge_candidates(trending, searched, state, report_date)
     relevant, relevance_diagnostics = filter_relevant_with_diagnostics(merged, config)
-    ranked = rank_candidates(relevant, config, report_date)
+    ranked_all = rank_candidates(relevant, config, report_date, apply_cap=False)
+    ranked = ranked_all[: int(config["ranking"]["max_candidates"])]
     output_settings = config.get("output", {})
     fresh_hot_days = int(output_settings.get("fresh_hot_days", 7))
     prior_seen_names = load_recent_shown_names(output_dir, report_date, fresh_hot_days)
@@ -987,7 +1061,8 @@ def main() -> int:
         "fresh_hot_seen_count": len(prior_seen_names),
         "new_project_history_days": new_project_history_days,
         "new_project_seen_count": len(prior_new_project_names),
-    }, prior_seen_names=prior_seen_names, prior_new_project_names=prior_new_project_names)
+    }, prior_seen_names=prior_seen_names, prior_new_project_names=prior_new_project_names,
+       pool_ranked=ranked_all)
     technical_settings = config.get("technical_analysis", {})
     if technical_settings.get("enabled", False):
         cache_dir = resolve_data_path(technical_settings["cache_dir"], paths["data_root"])

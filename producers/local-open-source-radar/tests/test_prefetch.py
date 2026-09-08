@@ -51,7 +51,7 @@ class PrefetchContractTests(unittest.TestCase):
         self.assertEqual("collector failed", payload["stderr"])
         self.assertEqual([], payload["signals"]["hot_today"])
 
-    def test_success_forwards_schema_and_structured_categories(self):
+    def test_success_forwards_schema_and_semantic_category_definitions(self):
         report = {
             "schema_version": 1,
             "report_date": "2026-08-28",
@@ -66,6 +66,14 @@ class PrefetchContractTests(unittest.TestCase):
             "categories": {
                 "Agents": [{"full_name": "Acme/agent"}],
             },
+            "category_definitions": [
+                {
+                    "id": "agents",
+                    "label": "🤖 AI 智能体/工作流",
+                    "semantic_scope": "Agent runtimes",
+                    "semantic_exclusions": ["end-user apps"],
+                }
+            ],
             "instructions": "structured source",
         }
         with tempfile.TemporaryDirectory() as tmp:
@@ -82,7 +90,8 @@ class PrefetchContractTests(unittest.TestCase):
         self.assertEqual(0, return_code)
         self.assertTrue(payload["ok"])
         self.assertEqual(1, payload["schema_version"])
-        self.assertEqual(report["categories"], payload["categories"])
+        self.assertNotIn("categories", payload)
+        self.assertEqual(report["category_definitions"], payload["category_definitions"])
         self.assertEqual(report["signals"], payload["signals"])
 
 

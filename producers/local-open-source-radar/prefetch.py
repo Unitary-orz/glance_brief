@@ -36,6 +36,7 @@ def failure_payload(
         "quality": {"ok": False, "errors": [error], "candidate_count": 0},
         "signals": _empty_signals(),
         "categories": {},
+        "category_definitions": [],
         "instructions": "",
     }
 
@@ -87,6 +88,7 @@ def main() -> int:
             "quality",
             "signals",
             "categories",
+            "category_definitions",
             "instructions",
         )
         missing = [name for name in required if name not in report]
@@ -103,7 +105,7 @@ def main() -> int:
         "diagnostics": report["diagnostics"],
         "quality": report["quality"],
         "signals": report["signals"],
-        "categories": report["categories"],
+        "category_definitions": report["category_definitions"],
         "instructions": report["instructions"],
     }
     return emit(slim)

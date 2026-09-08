@@ -9,14 +9,16 @@ a runtime-supplied reader; it does not run this producer itself.
 The producer owns:
 
 - GitHub Trending and Search collection;
-- relevance filtering, source-aware ranking, and history-based freshness;
+- relevance filtering, source-aware ranking, and independent hot/fresh/discovery signal pools with explicit selection diagnostics;
 - technical evidence collection for selected new projects;
-- the current-day JSON snapshot and its quality status.
+- the current-day JSON snapshot, selection diagnostics, and its quality status.
 
 The root installer does **not** install or schedule this producer by default.
-Keep its collection schedule and report prompt in the runtime that owns the
-independent radar. This source package must not contain runtime Job IDs,
-message destinations, state files, or generated reports.
+The source package includes the environment-independent generic report Prompt at
+`prompts/report.md`; keep the collection schedule, runtime Job IDs, delivery
+wiring, message destinations, state files, and generated reports in the runtime
+that owns the independent radar. This source package must not contain those
+runtime artifacts or credentials.
 
 ## Runtime layout
 

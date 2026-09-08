@@ -457,6 +457,59 @@ class FreshHotTests(unittest.TestCase):
         )
         self.assertNotIn("Fresh/outside-hot", fresh_names)
 
+    def test_build_output_uses_full_pool_for_hot_and_discovery_signals(self):
+        # A mixed global Top-30 must not hide valid Trending or discovery items.
+        global_ranked = [
+            {
+                "full_name": f"New/repo-{index}",
+                "url": f"https://github.com/New/repo-{index}",
+                "description": "AI agent",
+                "topics": [],
+                "stars_total": 20,
+                "stars_today": 0,
+                "stars_delta": 0,
+                "sources": ["new:llm"],
+            }
+            for index in range(30)
+        ]
+        full_pool = global_ranked + [
+            {
+                "full_name": f"Trend/repo-{index}",
+                "url": f"https://github.com/Trend/repo-{index}",
+                "description": "AI agent",
+                "topics": [],
+                "stars_total": 100,
+                "stars_today": 40,
+                "stars_delta": 0,
+                "sources": ["github-trending"],
+            }
+            for index in range(10)
+        ]
+        config = {
+            "output": {"top_hot": 10, "top_new": 2, "top_fresh_hot": 3},
+            "categories": [],
+        }
+
+        output = radar.build_output(
+            global_ranked[:30],
+            config,
+            date(2026, 8, 30),
+            {},
+            pool_ranked=full_pool,
+        )
+
+        self.assertEqual(10, len(output["signals"]["hot_today"]))
+        self.assertEqual(2, len(output["signals"]["new_projects"]))
+        self.assertTrue(
+            all(item["full_name"].startswith("Trend/") for item in output["signals"]["hot_today"])
+        )
+        selection = output["diagnostics"]["selection"]
+        self.assertEqual(30, selection["artifact_ranked_count"])
+        self.assertEqual(40, selection["full_selection_pool_count"])
+        self.assertEqual(10, selection["hot"]["eligible_count"])
+        self.assertEqual(10, selection["hot"]["selected_count"])
+        self.assertEqual(30, selection["discovery"]["eligible_count"])
+
 
 class OutputValidationTests(unittest.TestCase):
     def test_validate_output_rejects_duplicate_and_mismatched_links(self):
