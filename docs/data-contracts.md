@@ -104,6 +104,7 @@ candidate_id
 
 - candidate ID；
 - 标题和证据文本；
+- Noon 专用、由规范化 `title` / `text` 程序派生的 `title_only`；正文为空或与标题相同时为 `true`，且不改变筛选、配额、优先级或排序；Agents payload 不包含该字段；
 - 报告语义所需的受限 extra；
 - section 与 selection limits；
 - 程序已经确定要展示的 `open_source_display_ids`，仅包含 candidate ID。
@@ -112,7 +113,7 @@ candidate_id
 
 ## Resolved schema 2
 
-模型返回的 ID 必须存在于 registry。Resolver 回填：
+模型返回的 ID 必须存在于 registry。Resolver 不信任模型声明的内容模式，而是根据 registry 中的原始 `title` / `text` 重新派生 Noon 详情的 `content_mode`。`title_only` 详情不得包含 `summary`；有独立正文的详情仍必须包含 `summary`。Resolver 回填：
 
 - 原题、日期和发布时间；
 - 精确 URL 与来源层级；

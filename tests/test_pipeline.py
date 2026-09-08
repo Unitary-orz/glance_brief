@@ -154,6 +154,7 @@ class AssemblyAndPayloadTests(unittest.TestCase):
             self.assertIn("candidate_id", payload_text)
             self.assertIn("International title", payload_text)
             self.assertIn("International evidence", payload_text)
+            self.assertIn('"title_only": false', payload_text)
             self.assertNotIn("https://wire.test/1", payload_text)
             self.assertNotIn("provenance", payload_text)
             self.assertNotIn("published_at", payload_text)
@@ -339,6 +340,7 @@ class OfflinePipelineTests(unittest.TestCase):
         payload_text = json.dumps(payload, ensure_ascii=False)
         self.assertNotIn("stars_today", payload_text)
         self.assertNotIn("provenance", payload_text)
+        self.assertNotIn("title_only", payload_text)
 
     def _run(self, report, response, output):
         response_path = output.parent / f"{report}-response.json"

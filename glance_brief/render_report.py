@@ -305,11 +305,10 @@ def _render_noon(semantic: Mapping[str, Any]) -> str:
             translation = item.get("headline_zh")
             if translation and _english_title(title):
                 title_line += f"（{_inline(translation, f'{path}.headline_zh')}）"
-            lines.extend([
-                title_line,
-                f"  {_inline(item['summary'], f'{path}.summary')}",
-                f"  > 来源：{_source_links(item['provenance'], f'{path}.provenance')}",
-            ])
+            lines.append(title_line)
+            if "summary" in item:
+                lines.append(f"  {_inline(item['summary'], f'{path}.summary')}")
+            lines.append(f"  > 来源：{_source_links(item['provenance'], f'{path}.provenance')}")
         if section_index != len(contracts.NOON_SECTION_IDS) - 1:
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"

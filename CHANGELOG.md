@@ -12,6 +12,7 @@
 - Agents semantic contract 增加 `open_source_descriptions`：模型只翻译程序已确定展示的项目简介，项目身份、URL、Star、fresh 和分类继续由程序锁定。
 - Agents AI 生态动态改为 `candidate_ids` 多候选绑定，增加短 `topic` 导语和更高密度摘要约束；resolver 合并候选 provenance、禁止重复引用，并在 AI 来源展示中隐藏 RSS/网页等传输标签。
 - Agents AI 生态编辑改为“最多三条生态变化切片”：先按事件/进展/互补主题聚类，优先覆盖不同生态维度和至少五个候选事实；resolver 对候选池较大但摘要覆盖不足的情况记录 warning。
+- Noon 增加程序派生的 `title_only` 条件契约：纯标题详情只渲染标题与来源，有独立正文的详情仍强制要求标题之外的摘要；该模式不参与筛选、配额、优先级或排序。
 
 ## 0.2.3 — 2026-08-25
 

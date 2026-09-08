@@ -54,7 +54,8 @@
   > 来源：[NS•Publisher](精确原文 URL)
 
 **② 宏观与商业**
-...
+- **只有标题的候选**
+  > 来源：[NA•Publisher](精确原文 URL)
 
 **③ AI 主线**
 - **原始非英文标题**
@@ -64,8 +65,9 @@
 
 约束：
 
-- 详情固定三段：`international`、`macro_business`、`ai`；每条详情固定三行。
+- 详情固定三段：`international`、`macro_business`、`ai`。有独立正文的详情固定为标题、摘要、来源三行；程序判定的纯标题详情只输出标题和来源两行，不伪造同义摘要。
 - 每条详情只绑定一个候选；模型不得跨事件或跨候选合并。
+- `title_only` 仅控制详情摘要是否必填及是否渲染，不改变候选筛选、配额、优先级或排序；该模式由程序根据规范化后的标题与正文确定，模型不得自报。
 - 原题由程序逐字回填。只有英文原题可附约 12–28 字中文对照；中文、日文等非英文标题不翻译。
 - `top_points` 只引用已选详情，最多五条；重复或未绑定项属于 hard failure，不生成报告。
 - AIHOT 条目页 URL 与原文 URL 是两个 provenance link，分别保留；renderer 使用 producer 提供的精确 URL。
@@ -82,8 +84,8 @@
 - `command_json` 默认不继承全部环境变量，只能获得基础变量与显式 `env_allowlist`。
 - 每次运行写入 `manifest.json`：报告、状态、生成时间、全部输入/输出 artifact 与 config 的 SHA-256、模型参数。
 - Agent-mode handoff 使用 `prepare` 固化 registry/payload/prompt 哈希，再由 `render-prepared` 从 run-scoped semantic JSON 渲染；render 不重新读取来源，任何 config/artifact 篡改都 hard fail。
-- `replay` 只接受成功且输入哈希一致的快照，在不读取来源、不调用模型的情况下重新 resolve/render；输入输出目录必须不同。
-- Agents 模型 `summary` 超过 140 字符属于 hard failure；Noon 模型 `summary` 仍使用 300 字符上限。
+- `replay` 只接受成功且输入哈希一致的快照，在不读取来源、不调用模型的情况下使用保存的 assembled 与 raw model response 重新 resolve/render；输入输出目录必须不同。旧 `resolved.json` 不承诺跨 resolved schema 直接验证或渲染兼容。
+- Agents 模型 `summary` 超过 140 字符属于 hard failure；Noon 有独立正文的模型 `summary` 仍使用 300 字符上限，纯标题详情省略该字段。
 
 ## Resolved schema 所有权
 

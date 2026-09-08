@@ -28,6 +28,7 @@ class NoonCurrentContractTests(unittest.TestCase):
                         "candidate_id": "c1111111111111111",
                         "headline": "International event advances",
                         "headline_zh": "国际事件取得新进展",
+                        "content_mode": "summary",
                         "summary": "国际事件出现进展。",
                         "published_at": "2026-08-30T01:00:00Z",
                         "provenance": [
@@ -47,6 +48,7 @@ class NoonCurrentContractTests(unittest.TestCase):
                         "candidate_id": "c2222222222222222",
                         "headline": "中文商业原标题",
                         "headline_zh": "不应出现的翻译",
+                        "content_mode": "summary",
                         "summary": "市场发布最新数据。",
                         "published_at": None,
                         "provenance": [
@@ -119,8 +121,85 @@ class ResolvedSchemaContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "control|newline|Markdown"):
             contracts.validate_resolved(broken)
 
+    def test_title_only_resolved_detail_rejects_summary(self):
+        broken = self._noon()
+        broken["sections"]["international"] = [{
+            "candidate_id": "c1111111111111111",
+            "headline": "Only a headline",
+            "content_mode": "title_only",
+            "summary": "A duplicate summary is not allowed.",
+            "provenance": [{
+                "channel_id": "wire",
+                "channel_label": "NA",
+                "links": [{"role": "article", "label": "Publisher", "url": "https://example.test/item"}],
+            }],
+        }]
+        with self.assertRaisesRegex(ValueError, "not allowed for title_only"):
+            contracts.validate_resolved(broken)
+
+    def test_summary_resolved_detail_requires_summary(self):
+        broken = self._noon()
+        broken["sections"]["international"] = [{
+            "candidate_id": "c1111111111111111",
+            "headline": "Headline with independent evidence",
+            "content_mode": "summary",
+            "provenance": [{
+                "channel_id": "wire",
+                "channel_label": "NA",
+                "links": [{"role": "article", "label": "Publisher", "url": "https://example.test/item"}],
+            }],
+        }]
+        with self.assertRaisesRegex(ValueError, "missing fields.*summary"):
+            contracts.validate_resolved(broken)
+
 
 class AdapterContractTests(unittest.TestCase):
+    def test_title_only_is_derived_without_polluting_generic_candidates(self):
+        source = {
+            "channel_id": "wire",
+            "channel_label": "NA",
+            "map": {
+                "title": "title",
+                "text": "summary",
+                "links": [{"role": "article", "label": "source", "path": "url"}],
+            },
+        }
+
+        title_only = adapters.normalize_candidate(
+            "wire",
+            source,
+            {
+                "title": "Ｆｏｏ   BAR",
+                "summary": "foo bar",
+                "url": "https://example.test/title-only",
+            },
+        )
+        empty_body = adapters.normalize_candidate(
+            "wire",
+            source,
+            {
+                "title": "Headline without body",
+                "summary": "",
+                "url": "https://example.test/empty-body",
+            },
+        )
+        with_body = adapters.normalize_candidate(
+            "wire",
+            source,
+            {
+                "title": "Foo bar",
+                "summary": "Foo bar with independent evidence.",
+                "url": "https://example.test/with-body",
+            },
+        )
+
+        self.assertNotIn("title_only", title_only)
+        self.assertNotIn("title_only", empty_body)
+        self.assertNotIn("title_only", with_body)
+        self.assertTrue(contracts.is_title_only_evidence(title_only["title"], title_only["text"]))
+        self.assertTrue(contracts.is_title_only_evidence(empty_body["title"], empty_body["text"]))
+        self.assertFalse(contracts.is_title_only_evidence(with_body["title"], with_body["text"]))
+
     def test_aihot_candidate_preserves_both_exact_links_and_hierarchy_spaces(self):
         source = {
             "driver": "json_file",
@@ -326,6 +405,41 @@ class ResolverContractTests(unittest.TestCase):
         assembled = self._assembled()
         with self.assertRaisesRegex(ValueError, "summary"):
             resolve.resolve_noon(model, assembled, "2026-08-30")
+
+    def test_title_only_detail_omits_summary_and_renders_title_plus_source(self):
+        assembled = self._assembled()
+        candidate_id = "c1111111111111111"
+        candidate = assembled["candidate_registry"][candidate_id]
+        candidate["text"] = candidate["title"]
+        candidate["title_only"] = True
+        model = self._model()
+        model["sections"]["international"][0].pop("summary")
+        model["sections"]["international"][0]["title_only"] = False
+
+        resolved, warnings = resolve.resolve_noon(model, assembled, "2026-08-30")
+        detail = resolved["sections"]["international"][0]
+        markdown = render_report.render_report(resolved)
+
+        self.assertEqual(detail["content_mode"], "title_only")
+        self.assertNotIn("summary", detail)
+        self.assertTrue(any(
+            warning.get("code") == "title_only_detail"
+            and warning.get("candidate_id") == candidate_id
+            for warning in warnings
+        ))
+        self.assertIn(
+            "- **International title**（国际事件取得最新进展消息）\n"
+            "  > 来源：[NS•Reuters](https://reuters.test/c1111111111111111)",
+            markdown,
+        )
+
+    def test_body_detail_still_requires_summary(self):
+        model = self._model()
+        model["sections"]["international"][0].pop("summary")
+        model["sections"]["international"][0]["title_only"] = True
+
+        with self.assertRaisesRegex(ValueError, "summary"):
+            resolve.resolve_noon(model, self._assembled(), "2026-08-30")
 
     def test_resolver_backfills_immutable_facts_and_returns_soft_warning(self):
         assembled = self._assembled()
@@ -609,6 +723,15 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("selection_limits", prompt)
         self.assertIn("min", prompt)
         self.assertIn("max", prompt)
+        for marker in (
+            "`title_only=true`",
+            "纯标题候选必须省略 `summary`",
+            "标题之外",
+            "不得自行判断或填写 `title_only`",
+        ):
+            self.assertIn(marker, prompt)
+        for forbidden in ("在重要性接近时", "纯标题候选仅在", "补位"):
+            self.assertNotIn(forbidden, prompt)
 
     def test_agents_prompt_excludes_program_owned_facts_and_requires_two_trends(self):
         prompt = (ROOT / "glance_brief" / "prompts" / "agents-report.md").read_text(encoding="utf-8")

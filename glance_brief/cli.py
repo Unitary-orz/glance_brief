@@ -93,14 +93,25 @@ def write_manifest(output: Path, *, report: str, status: str, extra: Mapping[str
     return path
 
 
-def _lean_candidate(candidate: Mapping[str, Any], *, extra_allow: set[str]) -> dict[str, Any]:
+def _lean_candidate(
+    candidate: Mapping[str, Any],
+    *,
+    extra_allow: set[str],
+    include_title_only: bool = False,
+) -> dict[str, Any]:
     cid = candidate.get("candidate_id")
     contracts.candidate_id(cid, "candidate.candidate_id")
     title = candidate.get("title", "")
     text = candidate.get("text", "")
     if not isinstance(title, str) or not isinstance(text, str):
         raise contracts.ContractError("candidate title/text must be strings")
-    result: dict[str, Any] = {"candidate_id": cid, "title": title, "text": text}
+    result: dict[str, Any] = {
+        "candidate_id": cid,
+        "title": title,
+        "text": text,
+    }
+    if include_title_only:
+        result["title_only"] = contracts.is_title_only_evidence(title, text)
     extra = candidate.get("extra", {})
     if isinstance(extra, Mapping):
         selected = {key: extra[key] for key in sorted(extra_allow) if key in extra}
@@ -113,7 +124,13 @@ def _lean_candidate(candidate: Mapping[str, Any], *, extra_allow: set[str]) -> d
     return result
 
 
-def _section_candidates(assembled: Mapping[str, Any], section_id: str, *, extra_allow: set[str]) -> list[dict[str, Any]]:
+def _section_candidates(
+    assembled: Mapping[str, Any],
+    section_id: str,
+    *,
+    extra_allow: set[str],
+    include_title_only: bool = False,
+) -> list[dict[str, Any]]:
     registry = assembled.get("candidate_registry")
     sections = assembled.get("sections")
     if not isinstance(registry, Mapping) or not isinstance(sections, Mapping):
@@ -125,7 +142,13 @@ def _section_candidates(assembled: Mapping[str, Any], section_id: str, *, extra_
     for index, cid in enumerate(ids):
         if cid not in registry or not isinstance(registry[cid], Mapping):
             raise contracts.ContractError(f"assembled section {section_id}[{index}] has an unknown candidate")
-        rows.append(_lean_candidate(registry[cid], extra_allow=extra_allow))
+        rows.append(
+            _lean_candidate(
+                registry[cid],
+                extra_allow=extra_allow,
+                include_title_only=include_title_only,
+            )
+        )
     return rows
 
 
@@ -145,6 +168,7 @@ def build_model_payload(report_id: str, assembled: Mapping[str, Any]) -> dict[st
                     assembled,
                     section,
                     extra_allow={"category", "source", "type", "tags"},
+                    include_title_only=True,
                 )
                 for section in contracts.NOON_SECTION_IDS
             },

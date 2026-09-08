@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as _datetime
 import math
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit
@@ -85,6 +86,21 @@ def safe_text(value: Any, path: str, *, allow_empty: bool = False) -> str:
     if re.match(r"^\s*(?:[-+*>#]|\d+[.)])\s", value):
         raise ContractError(f"{path} starts with Markdown block syntax")
     return " ".join(value.split())
+
+
+def is_title_only_evidence(title: Any, text: Any) -> bool:
+    """Return whether normalized evidence contains only the headline."""
+    if not isinstance(title, str) or not isinstance(text, str):
+        raise ContractError("candidate title/text must be strings")
+
+    def normalized(value: str) -> str:
+        return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+
+    normalized_title = normalized(title)
+    normalized_text = normalized(text)
+    return bool(normalized_title) and (
+        not normalized_text or normalized_text == normalized_title
+    )
 
 
 def url(value: Any, path: str) -> str:
@@ -201,15 +217,23 @@ def _validate_noon_detail(value: Any, path: str) -> None:
     detail = _require_mapping(value, path)
     _only_keys(
         detail,
-        {"candidate_id", "headline", "headline_zh", "summary", "published_at", "provenance"},
+        {"candidate_id", "headline", "headline_zh", "content_mode", "summary", "published_at", "provenance"},
         path,
     )
-    _required(detail, {"candidate_id", "headline", "summary", "provenance"}, path)
+    _required(detail, {"candidate_id", "headline", "content_mode", "provenance"}, path)
     candidate_id(detail["candidate_id"], f"{path}.candidate_id")
     safe_text(detail["headline"], f"{path}.headline")
     if "headline_zh" in detail and detail["headline_zh"] not in (None, ""):
         safe_text(detail["headline_zh"], f"{path}.headline_zh")
-    safe_text(detail["summary"], f"{path}.summary")
+    content_mode = detail["content_mode"]
+    if content_mode not in {"summary", "title_only"}:
+        raise ContractError(f"{path}.content_mode must be summary or title_only")
+    if content_mode == "summary":
+        if "summary" not in detail:
+            raise ContractError(f"{path} is missing fields: ['summary']")
+        safe_text(detail["summary"], f"{path}.summary")
+    elif "summary" in detail:
+        raise ContractError(f"{path}.summary is not allowed for title_only content")
     published = detail.get("published_at")
     if published is not None:
         timestamp(published, f"{path}.published_at")

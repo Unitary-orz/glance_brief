@@ -38,7 +38,7 @@ runtime adapter / delivery
 
 - 调用来源、重试、超时和受控环境；
 - 保留原始 URL、标题、发布时间、项目身份、指标和分类；
-- 将来源映射为有稳定 `candidate_id` 的 registry；
+- 将来源映射为有稳定 `candidate_id` 的 registry；Noon lean payload 再从规范化后的标题/正文确定性派生 `title_only`；
 - 拒绝标题或证据文本中夹带 URL 等不安全候选，并记录 `candidate_rejections`；对已明确配置 `strip_urls_from_text` 的来源，只删除正文/description 中的 URL，独立 provenance URL 不受影响；
 - 执行来源级 `required`、原始记录 `exclude` 和报告级 `minimum_candidates`；exclude 在候选构造及 `take` 之前执行。
 
@@ -50,7 +50,7 @@ runtime adapter / delivery
 
 - 将 payload 内的 AI 候选先按事件、进展或明确互补主题聚类，再选择最多三个生态变化切片；每条用 `candidate_ids` 绑定 1–3 个候选，候选池达到 5 条时默认争取覆盖至少 5 个候选，全文不得复用 ID；
 - 为每条 AI 动态写短 `topic` 和高密度事实摘要；同簇事实可用分号并列，但摘要只能使用绑定候选证据的并集，不得补出跨候选因果；
-- 为英文原题提供可选中文对照；
+- 为英文原题提供可选中文对照；Noon 纯标题候选省略摘要且只展示标题与来源，有独立正文的候选仍须提供标题之外的摘要；
 - 根据对应候选文本，为程序已确定展示的项目填写中文简介；
 - 写不含项目身份和指标的总体趋势。
 

@@ -312,19 +312,33 @@ def resolve_noon(
         for index, value in enumerate(items):
             path = f"model.sections.{section_id}[{index}]"
             cid, candidate = _candidate(registry, assembled_sections, section_id, value, path, used)
-            summary = _check_summary(value.get("summary"), candidate, f"{path}.summary")
             title = candidate.get("title")
             text = candidate.get("text")
             if not isinstance(title, str) or not isinstance(text, str):
                 raise contracts.ContractError(f"candidate_registry.{cid} has invalid immutable text")
+            title_only = contracts.is_title_only_evidence(title, text)
             headline_zh = value.get("headline_zh")
             resolved_detail: dict[str, Any] = {
                 "candidate_id": cid,
                 "headline": title,
-                "summary": summary,
+                "content_mode": "title_only" if title_only else "summary",
                 "published_at": candidate.get("published_at"),
                 "provenance": _candidate_provenance(candidate, f"resolved.sections.{section_id}[{index}].provenance"),
             }
+            if title_only:
+                warnings.append(
+                    {
+                        "code": "title_only_detail",
+                        "candidate_id": cid,
+                        "section": section_id,
+                    }
+                )
+            else:
+                resolved_detail["summary"] = _check_summary(
+                    value.get("summary"),
+                    candidate,
+                    f"{path}.summary",
+                )
             if headline_zh not in (None, ""):
                 headline_zh = _safe_model_text(headline_zh, f"{path}.headline_zh")
                 chinese_characters = len(re.findall(r"[\u3400-\u9fff]", headline_zh))

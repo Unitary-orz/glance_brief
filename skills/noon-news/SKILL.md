@@ -38,13 +38,13 @@ URL、来源标签、发布时间和原题必须来自 producer，不得搜索�
 模型只返回：
 
 - 每条唯一 `candidate_id`；
-- 单候选事实摘要；
+- 有独立正文时的单候选事实摘要；纯标题候选省略摘要；
 - 英文原题的可选中文对照；
 - 绑定已选详情的今日要点。
 
 模型不得返回 URL、来源、日期、Markdown，不得跨候选合并事实或换算数字。
 
-程序负责回填原题、来源、精确 URL、发布时间，验证数字 provenance、selection limits 和安全文本，并生成固定 Markdown。完整语义契约见 `glance_brief/prompts/noon-news.md`，可见格式见 `docs/output-contracts.md`。
+程序负责回填原题、来源、精确 URL、发布时间，根据规范化后的标题/正文派生 `title_only`，验证数字 provenance、selection limits 和安全文本，并生成固定 Markdown。`title_only` 不改变筛选、配额、优先级或排序。完整语义契约见 `glance_brief/prompts/noon-news.md`，可见格式见 `docs/output-contracts.md`。
 
 ## 固定结构
 
@@ -52,11 +52,13 @@ URL、来源标签、发布时间和原题必须来自 producer，不得搜索�
 2. `宏观与商业`；
 3. `AI 主线`。
 
-每条详情固定三行：
+有独立正文的详情固定三行：
 
 1. 原始标题；仅英文标题可附约 12–28 字中文对照；
 2. 一句候选支持的事实；
 3. 独立来源引用块。
+
+纯标题详情只输出原始标题（英文题可附中文对照）和独立来源引用块，不生成同义摘要。
 
 来源链接正文不显示 URL 明文；同渠道去重，每条最多两个渠道，更多显示 `+N`。AI HOT 条目页与原文链接分层保留。
 
