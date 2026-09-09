@@ -605,7 +605,7 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertLess(markdown.index("**🧠 CodexRadar 智力效率**"), markdown.index("**🔥 开源热点趋势**"))
         self.assertIn(assembled["metadata"]["codexradar"]["markdown"], markdown)
         self.assertIn("**✨新热门开源**", markdown)
-        self.assertIn("- ① 生态协作：AI 生态出现新的协作信号。", markdown)
+        self.assertIn("- ① **生态协作**：AI 生态出现新的协作信号。", markdown)
         self.assertIn("- ① 开源工具继续向更轻量的工作流整合。", markdown)
         self.assertIn("- [acme/alpha](https://github.com/acme/alpha)「用于构建紧凑型智能体运行时。」(+42★/日)（Agent 工具）", markdown)
         self.assertLess(markdown.index("**✨新热门开源**"), markdown.index("📦**最热门开源**"))
@@ -621,6 +621,16 @@ class AgentsCurrentContractTests(unittest.TestCase):
         self.assertNotIn("热门项目：", markdown)
         self.assertNotIn("其他项目", markdown)
         self.assertNotIn("\n---\n", markdown)
+
+    def test_agents_ecosystem_topic_is_bounded_and_renderer_bolds_it(self):
+        too_long = self._model()
+        too_long["ai_ecosystem"][0]["topic"] = "这是一个过长的生态主题"
+        with self.assertRaisesRegex(ValueError, "4-8 characters"):
+            resolve.resolve_agents(too_long, self._assembled(), "2026-08-30")
+
+        resolved, _warnings = resolve.resolve_agents(self._model(), self._assembled(), "2026-08-30")
+        markdown = render_report.render_report(resolved)
+        self.assertIn("- ① **生态协作**：", markdown)
 
     def test_category_mapping_must_uniquely_cover_hot_today(self):
         for categories in (
@@ -869,7 +879,7 @@ class AgentsMultiCandidateContractTests(unittest.TestCase):
         self.assertEqual(len(item["provenance"][0]["links"]), 4)
 
         markdown = render_report.render_report(resolved)
-        self.assertIn("- ① AI 安全与对齐：两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。", markdown)
+        self.assertIn("- ① **AI 安全与对齐**：两条相关信号共同指向 AI 安全议题，第二条涉及 42 个模型。", markdown)
         self.assertNotIn("https://aihot.test/", markdown)
         source_line = next(line for line in markdown.splitlines() if "（来源：" in line)
         self.assertLessEqual(source_line.count("]("), 2)

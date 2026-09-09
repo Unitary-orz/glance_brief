@@ -329,7 +329,7 @@ def _render_agents(semantic: Mapping[str, Any]) -> str:
         topic = _inline(item["topic"], f"{path}.topic")
         summary = _inline(item["summary"], f"{path}.summary")
         source = _ai_ecosystem_source_links(item["provenance"], f"{path}.provenance")
-        lines.append(f"- {_circled(index)} {topic}：{summary}（来源：{source}）")
+        lines.append(f"- {_circled(index)} **{topic}**：{summary}（来源：{source}）")
     # The Codex block is producer-owned.  Do not parse, normalize, or rebuild it.
     codex = sections["codexradar"]["markdown"]
     lines.extend(["", codex, "", "**🔥 开源热点趋势**"])

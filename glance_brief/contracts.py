@@ -179,6 +179,14 @@ def short_topic(value: Any, path: str = "topic") -> str:
     return text
 
 
+def ecosystem_topic(value: Any, path: str = "topic") -> str:
+    """Validate the compact lead label for Agents ecosystem clusters."""
+    text = short_topic(value, path)
+    if not 4 <= len(text) <= 8:
+        raise ContractError(f"{path} must contain 4-8 characters")
+    return text
+
+
 def validate_provenance(value: Any, path: str = "provenance") -> None:
     channels = _require_list(value, path)
     if not channels:
@@ -352,7 +360,7 @@ def _validate_agents(value: Mapping[str, Any]) -> None:
         if reused:
             raise ContractError(f"{path}.candidate_ids reuses {sorted(reused)!r}")
         seen.update(ids)
-        short_topic(item["topic"], f"{path}.topic")
+        ecosystem_topic(item["topic"], f"{path}.topic")
         safe_text(item["summary"], f"{path}.summary")
         validate_provenance(item["provenance"], f"{path}.provenance")
     codex = _require_mapping(sections["codexradar"], "resolved.sections.codexradar")

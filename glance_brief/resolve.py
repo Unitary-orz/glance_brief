@@ -743,7 +743,7 @@ def resolve_agents(
             path,
             seen_ai,
         )
-        topic = contracts.short_topic(item.get("topic"), f"{path}.topic")
+        topic = contracts.ecosystem_topic(item.get("topic"), f"{path}.topic")
         summary = _check_ai_summary(item.get("summary"), candidates, f"{path}.summary")
         ai_resolved.append({
             "candidate_ids": candidate_id_list,
