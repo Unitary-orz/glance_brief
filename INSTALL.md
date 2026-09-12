@@ -127,6 +127,61 @@ GLANCE_BRIEF_TIMEOUT
 Set schedule and delivery only from the user-approved values. Never commit real
 job IDs, chat IDs, credentials, or user model configuration.
 
+## 2A. Explicit V2 Preview runtime installation
+
+The V2 source-owned runtime is installed only by an explicit opt-in; the default
+`--runtime hermes` path above remains the formal schema 2 batch runtime.
+
+```bash
+python3 install/install.py install --runtime hermes-preview \
+  --components agents-report,noon-news \
+  --prefix <hermes-home>
+```
+
+This maps the committed `runtime/preview/` tree to:
+
+```text
+<hermes-home>/scripts/glance-brief-v2/
+  agents-v2.py, noon-v2.py       flat Cron entry points
+  entrypoints/                    source entrypoint copies
+  lib/glance_brief/               complete Preview core + prompts
+  cron-prompts/                   self-contained handoff prompts
+<hermes-home>/data/glance-brief-v2/
+  config/brief.preview.example.json
+  config/brief-live.json          user-authored schema 3 config
+  install-manifest.json           source revision + owned-file hashes
+```
+
+The installer also prints `jobs_to_create` with `no_agent: false`, the handoff
+prompt, and the required deployment environment variables. It never edits
+`jobs.json`, creates a delivery target, or enables a job. Set these values in the
+scheduler process rather than committing them:
+
+```text
+GLANCE_BRIEF_PREVIEW_CONFIG
+GLANCE_BRIEF_PREVIEW_PREFETCH
+GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR   # required for Agents; use the actual dated local-radar publication root
+GLANCE_BRIEF_PREVIEW_MODEL
+GLANCE_BRIEF_PREVIEW_PROVIDER
+GLANCE_BRIEF_PREVIEW_REASONING         # default medium
+```
+
+Copy and customize the installed Preview example to `brief-live.json`, replace
+fixture paths with production source paths, then validate it with:
+
+```bash
+<hermes-home>/scripts/glance-brief-v2/agents-v2.py --help
+<hermes-home>/scripts/glance-brief-v2/noon-v2.py --help
+python3 install/install.py verify --runtime hermes-preview --prefix <hermes-home>
+```
+
+Before creating Preview jobs, inspect the scheduler for the corresponding formal
+writers and choose exactly one writer per report and destination. Do not enable
+V2 alongside the old writer merely because both pass their own health checks.
+Keep the old runtime tree and exact job records until the first normal-schedule
+V2 run is accepted; rollback means restoring both from that backup. The sample
+mapping is also available at `adapters/hermes/jobs.preview.example.json`.
+
 ## 4. Verify
 
 After writing `brief.json` and creating approved jobs:

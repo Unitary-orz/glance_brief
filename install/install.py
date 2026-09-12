@@ -34,6 +34,7 @@ import importlib.util
 import json
 import py_compile
 import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -162,6 +163,29 @@ def report_entrypoint(report_id: str) -> str:
     return REPORT_ENTRYPOINT_TEMPLATE.replace("__REPORT_ID__", report_id)
 
 
+PREVIEW_FLAT_ENTRYPOINT_TEMPLATE = """#!/usr/bin/env python3
+\"\"\"Installed flat wrapper for the V2 Preview semantic handoff entry point.\"\"\"
+from __future__ import annotations
+
+import os
+import runpy
+from pathlib import Path
+
+RUNTIME_ROOT = Path(__file__).resolve().parent
+HERMES_HOME = RUNTIME_ROOT.parents[1]
+os.environ.setdefault("HERMES_HOME", str(HERMES_HOME))
+os.environ.setdefault("GLANCE_BRIEF_PREVIEW_ROOT", str(RUNTIME_ROOT))
+runpy.run_path(
+    str(RUNTIME_ROOT / "entrypoints" / "__PREVIEW_ENTRYPOINT__"),
+    run_name="__main__",
+)
+"""
+
+
+def preview_flat_entrypoint(entrypoint: str) -> str:
+    return PREVIEW_FLAT_ENTRYPOINT_TEMPLATE.replace("__PREVIEW_ENTRYPOINT__", entrypoint)
+
+
 ENTRYPOINT_AGENTS_REPORT = report_entrypoint("agents-report")
 ENTRYPOINT_NOON_NEWS = report_entrypoint("noon-news")
 
@@ -235,22 +259,22 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def check_runtime_config(path: Path, components: list[str]) -> tuple[bool, str]:
+def check_runtime_config(path: Path, components: list[str], schema_version: int) -> tuple[bool, str]:
     """Validate the minimum installer/runtime boundary without importing the core."""
     if not path.is_file():
-        return False, f"missing {path}; create it from brief.example.json"
+        return False, f"missing {path}; create it from the installed example"
     try:
         config = load_json(path)
     except (OSError, ValueError) as exc:
         return False, f"invalid {path}: {exc}"
     reports = config.get("reports")
     valid = (
-        config.get("schema_version") == 2
+        config.get("schema_version") == schema_version
         and isinstance(reports, dict)
         and all(component in reports for component in components)
     )
     if not valid:
-        return False, "must be schema 2 and configure every installed report"
+        return False, f"must be schema {schema_version} and configure every installed report"
     return True, str(path)
 
 
@@ -307,6 +331,121 @@ def plan_lib_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Pat
     return pairs
 
 
+def plan_preview_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Path]]:
+    spec = manifest["preview_runtime"]
+    lib_source = REPO_ROOT / spec["lib_source"]
+    if not lib_source.is_dir():
+        raise SystemExit(f"ERROR: preview lib source missing: {lib_source}")
+    pairs = [
+        (source, Path("lib") / "glance_brief" / source.relative_to(lib_source))
+        for source in sorted(lib_source.rglob("*"))
+        if source.is_file() and "__pycache__" not in source.parts
+    ]
+    for component in components:
+        entry = spec["entrypoints"].get(component)
+        prompt = spec["cron_prompts"].get(component)
+        if not isinstance(entry, dict) or not isinstance(prompt, str):
+            raise SystemExit(f"ERROR: preview runtime mapping missing for {component}")
+        source = REPO_ROOT / entry["source"]
+        prompt_source = REPO_ROOT / prompt
+        if not source.is_file():
+            raise SystemExit(f"ERROR: preview entrypoint source missing: {source}")
+        if not prompt_source.is_file():
+            raise SystemExit(f"ERROR: preview Cron prompt missing: {prompt_source}")
+        pairs.append((source, Path(entry["installed"])))
+        pairs.append((prompt_source, Path("cron-prompts") / Path(prompt).name))
+    return pairs
+
+
+def is_preview_runtime(runtime_spec: dict) -> bool:
+    return runtime_spec.get("kind") == "preview-agent-handoff"
+
+
+def runtime_entrypoint_names(installed: dict | None) -> set[str]:
+    if not installed:
+        return set(ENTRYPOINTS)
+    names = {installed.get("core_entrypoint", "")}
+    names.update(installed.get("entrypoints", {}).values())
+    for item in installed.get("owned_files", []):
+        path = item.get("path")
+        if isinstance(path, str) and not path.startswith("lib/") and path.endswith(".py"):
+            names.add(Path(path).name)
+    return {name for name in names if name}
+
+
+def repository_provenance() -> dict[str, object]:
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return {"source_revision": None, "source_dirty": None}
+    return {"source_revision": revision, "source_dirty": bool(status)}
+
+
+def preview_job_suggestions(manifest: dict, components: list[str], runtime_spec: dict) -> dict[str, dict]:
+    preview = manifest["preview_runtime"]
+    script_dir = Path(runtime_spec["scripts_dir"]).name
+    jobs = {}
+    for component in components:
+        entry = preview["entrypoints"][component]
+        prompt_path = REPO_ROOT / preview["cron_prompts"][component]
+        required_environment = [
+            "GLANCE_BRIEF_PREVIEW_CONFIG",
+            "GLANCE_BRIEF_PREVIEW_PREFETCH",
+            "GLANCE_BRIEF_PREVIEW_MODEL",
+            "GLANCE_BRIEF_PREVIEW_PROVIDER",
+            "GLANCE_BRIEF_PREVIEW_REASONING",
+        ]
+        if component == "agents-report":
+            required_environment.append("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR")
+        jobs[component] = {
+            "name": component,
+            "script": f"{script_dir}/{entry['cron_entrypoint']}",
+            "no_agent": False,
+            "prompt": prompt_path.read_text(encoding="utf-8"),
+            "default_schedule": manifest["components"][component]["default_schedule"],
+            "required_environment": required_environment,
+        }
+    return jobs
+
+
+def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict) -> list[dict]:
+    if not is_preview_runtime(runtime_spec):
+        return []
+    preview = manifest["preview_runtime"]["entrypoints"]
+    conflicts = []
+    for component, component_spec in manifest["components"].items():
+        writer_names = {component_spec["entrypoint"]}
+        if component in preview:
+            writer_names.add(preview[component]["cron_entrypoint"])
+        active = [
+            {
+                "id": job.get("id"),
+                "name": job.get("name"),
+                "script": job.get("script"),
+                "deliver": job.get("deliver"),
+            }
+            for job in jobs
+            if job.get("enabled", True) is not False
+            and Path(job.get("script") or "").name in writer_names
+        ]
+        if len(active) > 1:
+            conflicts.append({"component": component, "writers": active})
+    return conflicts
+
+
 def render_entrypoints(manifest: dict, components: list[str]) -> list[tuple[str, str]]:
     files = [(manifest["core"]["entrypoint"], ENTRYPOINTS[manifest["core"]["entrypoint"]])]
     for comp in components:
@@ -321,6 +460,7 @@ def cmd_install(args) -> int:
     manifest = load_json(MANIFEST_PATH)
     home = hermes_home(args.prefix)
     rt = manifest["runtime_adapters"][args.runtime]
+    preview_runtime = is_preview_runtime(rt)
     scripts_root = home / rt["scripts_dir"]
     data_root = home / rt["data_dir"]
 
@@ -329,40 +469,78 @@ def cmd_install(args) -> int:
     if unknown:
         raise SystemExit(f"ERROR: unknown components: {', '.join(unknown)}")
 
-    plan = {"scripts_dir": str(scripts_root), "data_dir": str(data_root)}
-    changes = {"core_files": [], "lib_files": [], "entrypoints": [], "config_files": [], "dirs": []}
+    plan = {
+        "scripts_dir": str(scripts_root),
+        "data_dir": str(data_root),
+        "runtime_kind": rt.get("kind", "formal-batch"),
+        **repository_provenance(),
+    }
+    changes = {
+        "core_files": [],
+        "lib_files": [],
+        "runtime_files": [],
+        "entrypoints": [],
+        "config_files": [],
+        "dirs": [],
+    }
 
-    core_pairs = plan_core_copy(manifest)
-    lib_pairs = plan_lib_copy(manifest, components)
-    entry_files = render_entrypoints(manifest, components)
+    if preview_runtime:
+        core_pairs = []
+        lib_pairs = []
+        runtime_pairs = plan_preview_copy(manifest, components)
+        entry_files = [
+            (
+                manifest["preview_runtime"]["entrypoints"][component]["cron_entrypoint"],
+                preview_flat_entrypoint(
+                    Path(manifest["preview_runtime"]["entrypoints"][component]["installed"]).name
+                ),
+            )
+            for component in components
+        ]
+    else:
+        core_pairs = plan_core_copy(manifest)
+        lib_pairs = plan_lib_copy(manifest, components)
+        runtime_pairs = core_pairs + lib_pairs
+        entry_files = render_entrypoints(manifest, components)
 
     # dirs
     for sub in ("config", "state", "cache", "output"):
         changes["dirs"].append(str(data_root / sub))
 
-    # shared core and component libraries (always updated on re-install)
-    for src, rel in core_pairs:
-        changes["core_files"].append(str(scripts_root / rel))
-    for src, rel in lib_pairs:
-        changes["lib_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
+    core_rels = {rel for _src, rel in core_pairs}
+    # project-owned runtime files (always updated on re-install)
+    for src, rel in runtime_pairs:
+        changes["runtime_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
+        if not preview_runtime and rel in core_rels:
+            changes["core_files"].append(str(scripts_root / rel))
+        elif str(rel).startswith("lib/"):
+            changes["lib_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
 
-    # entrypoints (always updated)
+    # flat scheduler entrypoints (always updated)
     for name, _content in entry_files:
         changes["entrypoints"].append(str(scripts_root / name))
 
     # default configs (only when target missing)
-    core_config = manifest["core"]
-    core_config_dst = data_root / "config" / core_config["config_target"]
+    if preview_runtime:
+        preview_spec = manifest["preview_runtime"]
+        config_template = preview_spec["config_template"]
+        config_target = preview_spec["config_target"]
+    else:
+        core_config = manifest["core"]
+        config_template = core_config["config_template"]
+        config_target = core_config["config_target"]
+    core_config_dst = data_root / "config" / config_target
     if not core_config_dst.exists():
         changes["config_files"].append({
-            "template": core_config["config_template"],
+            "template": config_template,
             "dst": str(core_config_dst),
         })
-    for comp in components:
-        for target, template_rel in manifest["components"][comp].get("config_templates", {}).items():
-            dst = data_root / "config" / target
-            if not dst.exists():
-                changes["config_files"].append({"template": template_rel, "dst": str(dst)})
+    if not preview_runtime:
+        for comp in components:
+            for target, template_rel in manifest["components"][comp].get("config_templates", {}).items():
+                dst = data_root / "config" / target
+                if not dst.exists():
+                    changes["config_files"].append({"template": template_rel, "dst": str(dst)})
 
     if args.dry_run:
         print(json.dumps({
@@ -380,7 +558,7 @@ def cmd_install(args) -> int:
     for d in changes["dirs"]:
         Path(d).mkdir(parents=True, exist_ok=True)
 
-    for src, rel in core_pairs + lib_pairs:
+    for src, rel in runtime_pairs:
         dst = scripts_root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
@@ -396,23 +574,23 @@ def cmd_install(args) -> int:
     skill_missing = check_external_skills(manifest.get("external_skills", {}), home)
 
     owned = []
-    for src, rel in core_pairs + lib_pairs:
+    for src, rel in runtime_pairs:
         owned.append({"path": str(rel), "sha256": sha256(src)})
     for name, _content in entry_files:
         dst = scripts_root / name
         owned.append({"path": name, "sha256": sha256(dst)})
 
-    installed = {
-        "schema_version": 2,
-        "project": manifest["project"],
-        "project_version": manifest["project_version"],
-        "runtime": args.runtime,
-        "components": components,
-        "scripts_dir": rt["scripts_dir"],
-        "data_dir": rt["data_dir"],
-        "core_entrypoint": manifest["core"]["entrypoint"],
-        "entrypoints": {comp: manifest["components"][comp]["entrypoint"] for comp in components},
-        "jobs": {
+    if preview_runtime:
+        preview_spec = manifest["preview_runtime"]
+        jobs = preview_job_suggestions(manifest, components, rt)
+        installed_entrypoints = {
+            component: preview_spec["entrypoints"][component]["cron_entrypoint"]
+            for component in components
+        }
+        user_config_files = [f"config/{preview_spec['config_target']}"]
+        runtime_config_file = f"config/{preview_spec['runtime_config_target']}"
+    else:
+        jobs = {
             comp: {
                 "name": comp,
                 "script": f"{Path(rt['scripts_dir']).name}/{manifest['components'][comp]['entrypoint']}",
@@ -420,17 +598,37 @@ def cmd_install(args) -> int:
                 "default_schedule": manifest["components"][comp]["default_schedule"],
             }
             for comp in components
-        },
-        "owned_files": owned,
-        "user_config_files": [
+        }
+        installed_entrypoints = {
+            comp: manifest["components"][comp]["entrypoint"] for comp in components
+        }
+        user_config_files = [
             f"config/{manifest['core']['config_target']}",
             *[
                 f"config/{name}"
                 for comp in components
                 for name in manifest["components"][comp].get("config_templates", {})
             ],
-        ],
-        "runtime_config_file": f"config/{manifest['core']['runtime_config_target']}",
+        ]
+        runtime_config_file = f"config/{manifest['core']['runtime_config_target']}"
+
+    installed = {
+        "schema_version": 2,
+        "project": manifest["project"],
+        "project_version": manifest["project_version"],
+        "runtime": args.runtime,
+        "runtime_kind": rt.get("kind", "formal-batch"),
+        "config_schema_version": rt["config_schema_version"],
+        "components": components,
+        "scripts_dir": rt["scripts_dir"],
+        "data_dir": rt["data_dir"],
+        "core_entrypoint": None if preview_runtime else manifest["core"]["entrypoint"],
+        "entrypoints": installed_entrypoints,
+        "jobs": jobs,
+        "owned_files": owned,
+        "user_config_files": user_config_files,
+        "runtime_config_file": runtime_config_file,
+        **repository_provenance(),
     }
     manifest_dst = data_root / INSTALL_MANIFEST_NAME
     manifest_dst.write_text(json.dumps(installed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -447,9 +645,23 @@ def cmd_install(args) -> int:
         "required_setup": [
             {
                 "action": "create_runtime_config",
-                "template": str(data_root / "config" / manifest["core"]["config_target"]),
+                "template": str(data_root / "config" / config_target),
                 "target": str(data_root / installed["runtime_config_file"]),
-            }
+            },
+            *([
+                {
+                    "action": "configure_scheduler_environment",
+                    "variables": [
+                        "GLANCE_BRIEF_PREVIEW_CONFIG",
+                        "GLANCE_BRIEF_PREVIEW_PREFETCH",
+                        "GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR",
+                        "GLANCE_BRIEF_PREVIEW_MODEL",
+                        "GLANCE_BRIEF_PREVIEW_PROVIDER",
+                        "GLANCE_BRIEF_PREVIEW_REASONING",
+                    ],
+                    "note": "Set deployment-specific values in the scheduler process; no live paths or credentials are stored by the installer.",
+                }
+            ] if preview_runtime else []),
         ],
         "jobs_to_create": list(installed["jobs"].values()),
     }
@@ -487,26 +699,33 @@ def cmd_verify(args) -> int:
                 if isinstance(item.get("path"), str) and not item["path"].startswith("lib/")
             }
         )
+    elif is_preview_runtime(rt):
+        expected_entrypoints = sorted(
+            entry["cron_entrypoint"]
+            for entry in manifest["preview_runtime"]["entrypoints"].values()
+        )
     else:
         expected_entrypoints = [manifest["core"]["entrypoint"]]
     for name in expected_entrypoints:
         p = scripts_root / name
         add(f"entrypoint:{name}", p.exists() and p.is_file(), str(p))
 
-    # owned files: lib must match hashes; entrypoints are runtime wrappers
+    # every owned file must exist and match its recorded source/runtime hash
     if installed:
         for owned in installed.get("owned_files", []):
             live = scripts_root / owned["path"]
             if not live.exists():
                 add(f"file:{owned['path']}", False, "missing")
                 continue
-            is_lib = owned["path"].startswith("lib/")
-            if is_lib:
-                live_sha = sha256(live)
-                ok = live_sha == owned["sha256"]
-                add(f"lib:{owned['path']}", ok, "match" if ok else f"drift {live_sha[:12]} != {owned['sha256'][:12]}")
-            else:
-                add(f"entrypoint:{owned['path']}", True, "present")
+            live_sha = sha256(live)
+            expected_sha = owned.get("sha256")
+            ok = live_sha == expected_sha
+            kind = "lib" if owned["path"].startswith("lib/") else "file"
+            add(
+                f"{kind}:{owned['path']}",
+                ok,
+                "match" if ok else f"hash drift {live_sha[:12]} != {str(expected_sha)[:12]}",
+            )
 
     # installed templates plus the user-authored runtime config
     if installed:
@@ -520,25 +739,35 @@ def cmd_verify(args) -> int:
             valid, detail = check_runtime_config(
                 data_root / runtime_rel,
                 installed.get("components", []),
+                int(installed.get("config_schema_version", rt.get("config_schema_version", 2))),
             )
             add("runtime-config", valid, detail)
 
-    # cron wiring: a job whose script resolves to our entrypoints.
+    # cron wiring: a job whose script resolves to our installed entrypoints.
     # Hermes job `script` is relative to $HERMES_HOME/scripts/.
     jobs_file = home / rt["jobs_file"]
     if jobs_file.exists():
         try:
             jobs = load_json(jobs_file).get("jobs", [])
             scripts_base = home / "scripts"
+            known_entrypoints = runtime_entrypoint_names(installed)
             wired = []
             for job in jobs:
                 script = job.get("script", "")
                 if not script:
                     continue
                 entry_name = Path(script).name
-                if entry_name in ENTRYPOINTS and (scripts_base / script).exists():
+                if entry_name in known_entrypoints and (scripts_base / script).exists():
                     wired.append({"job_id": job.get("id"), "name": job.get("name"), "script": script})
             add("cron-wiring", bool(wired), json.dumps(wired, ensure_ascii=False))
+            conflicts = single_writer_conflicts(manifest, jobs, rt)
+            add(
+                "single-writer",
+                not conflicts,
+                "one active writer per report"
+                if not conflicts
+                else json.dumps(conflicts, ensure_ascii=False),
+            )
         except (OSError, ValueError) as exc:
             add("cron-wiring", False, f"cannot read {jobs_file}: {exc}")
     else:
@@ -628,6 +857,7 @@ def cmd_doctor(args) -> int:
             valid, detail = check_runtime_config(
                 data_root / runtime_rel,
                 installed.get("components", []),
+                int(installed.get("config_schema_version", rt.get("config_schema_version", 2))),
             )
             emit("runtime", "runtime-config", "ok" if valid else "error", detail)
 
@@ -648,10 +878,20 @@ def cmd_doctor(args) -> int:
         try:
             jobs = load_json(jobs_file).get("jobs", [])
             scripts_base = home / "scripts"
+            known_entrypoints = runtime_entrypoint_names(installed)
             for job in jobs:
                 script = job.get("script", "")
-                if script and Path(script).name in ENTRYPOINTS and (scripts_base / script).exists():
+                if script and Path(script).name in known_entrypoints and (scripts_base / script).exists():
                     wired.append(job)
+            conflicts = single_writer_conflicts(manifest, jobs, rt)
+            emit(
+                "runtime",
+                "single-writer",
+                "error" if conflicts else "ok",
+                "one active writer per report"
+                if not conflicts
+                else json.dumps(conflicts, ensure_ascii=False),
+            )
         except (OSError, ValueError) as exc:
             emit("runtime", "cron-jobs", "error", f"cannot read {jobs_file}: {exc}")
     else:
@@ -726,12 +966,13 @@ def cmd_uninstall(args) -> int:
         try:
             jobs = load_json(jobs_file).get("jobs", [])
             scripts_base = home / "scripts"
+            known_entrypoints = runtime_entrypoint_names(installed)
             for job in jobs:
                 script = job.get("script", "")
                 if not script:
                     continue
                 entry_name = Path(script).name
-                if entry_name in ENTRYPOINTS and (scripts_base / script).exists():
+                if entry_name in known_entrypoints and (scripts_base / script).exists():
                     detach.append({"job_id": job.get("id"), "name": job.get("name"), "script": script})
         except (OSError, ValueError):
             pass
@@ -778,21 +1019,21 @@ def main() -> int:
     sub = parser.add_subparsers(dest="action", required=True)
 
     p_install = sub.add_parser("install", help="install or update project-owned files")
-    p_install.add_argument("--runtime", default="hermes", choices=["hermes"])
+    p_install.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
     p_install.add_argument("--components", default="", help="comma-separated components")
     p_install.add_argument("--prefix", default="", help="runtime home (default: $HERMES_HOME or ~/.hermes)")
     p_install.add_argument("--dry-run", action="store_true")
 
     p_verify = sub.add_parser("verify", help="verify installed state")
-    p_verify.add_argument("--runtime", default="hermes", choices=["hermes"])
+    p_verify.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
     p_verify.add_argument("--prefix", default="")
 
     p_doctor = sub.add_parser("doctor", help="runtime health check (read-only)")
-    p_doctor.add_argument("--runtime", default="hermes", choices=["hermes"])
+    p_doctor.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
     p_doctor.add_argument("--prefix", default="")
 
     p_uninstall = sub.add_parser("uninstall", help="remove project-owned files (keeps user config)")
-    p_uninstall.add_argument("--runtime", default="hermes", choices=["hermes"])
+    p_uninstall.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
     p_uninstall.add_argument("--prefix", default="")
     p_uninstall.add_argument("--dry-run", action="store_true")
 

@@ -38,9 +38,9 @@ CONFIG = Path(
 SNAPSHOT = DATA_ROOT / "source-snapshot.json"
 TZ = ZoneInfo("Asia/Shanghai")
 REPORT = "noon-news"
-MODEL = "MiniMax-M3"
-PROVIDER = "minimax-cn"
-REASONING = "low"
+MODEL = os.environ.get("GLANCE_BRIEF_PREVIEW_MODEL", "MiniMax-M3")
+PROVIDER = os.environ.get("GLANCE_BRIEF_PREVIEW_PROVIDER", "minimax-cn")
+REASONING = os.environ.get("GLANCE_BRIEF_PREVIEW_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
 from glance_brief import adapters, cli, contracts  # noqa: E402

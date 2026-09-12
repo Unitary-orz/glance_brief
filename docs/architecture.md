@@ -76,8 +76,11 @@ runtime adapter / delivery
 
 当前已验证的 V2 Preview 暂不覆盖正式 `glance_brief/` v0.3.0 包，而是
 完整保存在 `runtime/preview/`。这是 live V2 的可重建源码边界，包含
-入口、共享 core、Prompt、schema-v3 配置样例、离线 snapshot 和边界测试；
-正式 installer 只记录其来源位置，不会自动安装或改写现有 Cron。
+入口、共享 core、Prompt、schema-v3 配置样例、离线 snapshot、Cron handoff
+prompt 和边界测试。默认正式 installer 不会触碰它；显式使用
+`install/install.py install --runtime hermes-preview` 时，installer 按
+manifest 将完整依赖闭包映射到 `scripts/glance-brief-v2/`，记录 source
+revision/owned-file hashes，并仍然不自动修改 Cron 或投递。
 
 V2 的来源输入分为三类：`json_file` 和 `command_json` 负责得到一个独立
 payload，`snapshot_json` 只返回报告已加载的不可变 snapshot。所有来源都

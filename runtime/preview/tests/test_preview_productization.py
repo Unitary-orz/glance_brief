@@ -144,6 +144,18 @@ class PreviewWrapperBoundaryTests(unittest.TestCase):
             self.assertNotIn('payload.get("aihot")', text)
             self.assertNotIn('payload.get("codexradar")', text)
 
+    def test_runtime_metadata_is_deployment_configurable_and_publication_is_explicit(self) -> None:
+        for name in ("noon_preview.py", "agents_preview.py"):
+            text = (PREVIEW_ROOT / "entrypoints" / name).read_text(encoding="utf-8")
+            self.assertIn("GLANCE_BRIEF_PREVIEW_MODEL", text)
+            self.assertIn("GLANCE_BRIEF_PREVIEW_PROVIDER", text)
+            self.assertIn("GLANCE_BRIEF_PREVIEW_REASONING", text)
+            self.assertIn('"medium"', text)
+        agents = (PREVIEW_ROOT / "entrypoints" / "agents_preview.py").read_text(encoding="utf-8")
+        self.assertIn("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR", agents)
+        self.assertIn("PUBLICATION_DIR is None", agents)
+        self.assertNotIn('"local-radar"', agents)
+
 
 if __name__ == "__main__":
     unittest.main()

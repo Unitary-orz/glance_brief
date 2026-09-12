@@ -46,9 +46,12 @@ producer JSON
 已验证的 V2 Preview 不再藏在 `~/.hermes/scripts/glance-brief-v2` 这一份
 runtime 副本里；可重建源码统一收在 [`runtime/preview/`](runtime/preview/)。
 该目录包含两个入口、V2 core、Prompt、schema-v3 配置样例、离线 snapshot
-和解耦回归测试。V2 通过注册式 `snapshot_json` input adapter 让多个来源
-查看同一份不可变输入；`report_json` 只作兼容别名。当前只同步源码和契约，
-不自动修改正式包、Cron、投递或 live runtime。
+和解耦回归测试。默认 `--runtime hermes` 仍只安装正式 schema 2 批处理
+runtime；如需把这份源码映射到 `glance-brief-v2`，必须显式使用
+`install/install.py install --runtime hermes-preview`。该模式只安装文件、
+记录 source revision/owned-file hashes 并输出 Cron 建议，不自动修改正式包、
+Cron、投递或 live runtime。V2 通过注册式 `snapshot_json` input adapter 让多个
+来源查看同一份不可变输入；`report_json` 只作兼容别名。
 
 详见：
 

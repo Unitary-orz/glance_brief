@@ -38,19 +38,15 @@ CONFIG = Path(
 SNAPSHOT = DATA_ROOT / "source-snapshot.json"
 TZ = ZoneInfo("Asia/Shanghai")
 REPORT = "agents-report"
-MODEL = "MiniMax-M3"
-PROVIDER = "minimax-cn"
-REASONING = "low"
+MODEL = os.environ.get("GLANCE_BRIEF_PREVIEW_MODEL", "MiniMax-M3")
+PROVIDER = os.environ.get("GLANCE_BRIEF_PREVIEW_PROVIDER", "minimax-cn")
+REASONING = os.environ.get("GLANCE_BRIEF_PREVIEW_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
 from glance_brief import cli, local_radar_publication  # noqa: E402
 
-PUBLICATION_DIR = Path(
-    os.environ.get(
-        "GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR",
-        str(HERMES_HOME / "cron" / "output" / "local-radar"),
-    )
-).expanduser()
+PUBLICATION_DIR_VALUE = os.environ.get("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR")
+PUBLICATION_DIR = Path(PUBLICATION_DIR_VALUE).expanduser() if PUBLICATION_DIR_VALUE else None
 
 
 def _run(command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
@@ -85,6 +81,10 @@ def _atomic_json(path: Path, value: object) -> None:
 
 
 def _prefetch(report_date: str) -> dict:
+    if PUBLICATION_DIR is None:
+        raise RuntimeError(
+            "GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR must point to the dated local-radar publication root"
+        )
     result = _run([sys.executable, str(PREFETCH)], timeout=300)
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip()

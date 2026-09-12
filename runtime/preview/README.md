@@ -38,21 +38,49 @@ lib/glance_brief/
 - The repository does not contain live Cron metadata, generated reports,
   delivery IDs, credentials, or external source state.
 
-## Hermes deployment inputs
+## Hermes deployment mapping
 
-A deployment may point the wrapper at a runtime-specific configuration,
-data root, producer command, and publication directory using:
+The repository source is installed only through the explicit Preview mode:
 
-- `HERMES_HOME`
-- `GLANCE_BRIEF_PREVIEW_ROOT`
-- `GLANCE_BRIEF_PREVIEW_DATA`
-- `GLANCE_BRIEF_PREVIEW_CONFIG`
-- `GLANCE_BRIEF_PREVIEW_PREFETCH`
-- `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR`
+```bash
+python3 install/install.py install --runtime hermes-preview \
+  --components agents-report,noon-news \
+  --prefix <hermes-home>
+```
 
-These are deployment settings, not committed source. The active Hermes copy
-under `~/.hermes/scripts/glance-brief-v2` remains unchanged by this source-tree
-refactor; syncing it is a separate, explicitly scoped release step.
+The installer maps the tree deliberately rather than copying it blindly:
+
+| Repository source | Installed path |
+|---|---|
+| `runtime/preview/entrypoints/agents_preview.py` | `scripts/glance-brief-v2/entrypoints/agents_preview.py` |
+| `runtime/preview/entrypoints/noon_preview.py` | `scripts/glance-brief-v2/entrypoints/noon_preview.py` |
+| `runtime/preview/lib/glance_brief/` | `scripts/glance-brief-v2/lib/glance_brief/` |
+| `runtime/preview/cron/*.md` | `scripts/glance-brief-v2/cron-prompts/` |
+| generated flat adapters | `scripts/glance-brief-v2/agents-v2.py`, `noon-v2.py` |
+| `config/brief.preview.example.json` | `data/glance-brief-v2/config/brief.preview.example.json` |
+
+The installed manifest records the repository `source_revision`, whether the
+worktree was dirty at install time, and an SHA-256 entry for every owned runtime
+file. `install.py verify --runtime hermes-preview` checks that full closure,
+the schema 3 live config, and Cron script wiring. It does not create or edit
+Cron jobs.
+
+The runtime accepts deployment-specific values through its environment:
+`GLANCE_BRIEF_PREVIEW_CONFIG`, `GLANCE_BRIEF_PREVIEW_PREFETCH`,
+`GLANCE_BRIEF_PREVIEW_MODEL`, `GLANCE_BRIEF_PREVIEW_PROVIDER`, and
+`GLANCE_BRIEF_PREVIEW_REASONING`. Production jobs should set these explicitly;
+only the Agents runtime requires `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR`, and the
+wrapper fails closed when that path is absent instead of guessing a `local-radar`
+directory. The default reasoning metadata is `medium`, matching the currently
+verified Cron setting, and may be overridden only by an explicit deployment
+environment value.
+
+The active Hermes copy under `~/.hermes/scripts/glance-brief-v2` is still a
+separate installed runtime. Installing the repository Preview is not a
+production cutover: before enabling jobs, inspect all enabled writers for the
+same report and destination, preserve the old runtime/job records, and choose
+one writer per report. Rollback restores the saved runtime tree and scheduler
+records together.
 
 ## Verification
 

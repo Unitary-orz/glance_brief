@@ -49,6 +49,35 @@ Each report entry point is a complete batch application:
 The shared `glance_brief` package does not import Hermes or select a provider.
 Hermes-specific model invocation exists only in the installed runtime entry point.
 
+The explicit V2 Preview mode maps the source-owned tree through
+`python3 install/install.py install --runtime hermes-preview` to:
+
+```text
+$HERMES_HOME/scripts/glance-brief-v2/
+├── agents-v2.py                 # flat scheduler wrapper
+├── noon-v2.py                   # flat scheduler wrapper
+├── entrypoints/                 # source entrypoints retained for auditability
+├── lib/glance_brief/            # complete V2 core and Prompt closure
+└── cron-prompts/                # sanitized outer-Agent handoff prompts
+
+$HERMES_HOME/data/glance-brief-v2/config/
+├── brief.preview.example.json   # installed example; fixture-backed
+└── brief-live.json              # user-authored schema 3 config
+```
+
+The flat wrappers set `HERMES_HOME` and `GLANCE_BRIEF_PREVIEW_ROOT` from their
+installed location, so the mapping is relocatable under a different Hermes
+home. The installer records the repository `source_revision`, dirty-state
+marker, and hashes for every owned file. It does not create, disable, or update
+Cron jobs.
+
+Preview jobs are outer-Agent handoff jobs (`no_agent: false`) and must use the
+prompt printed by the installer or `adapters/hermes/jobs.preview.example.json`.
+The Agents job must set `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR` explicitly to the
+already-published local-radar directory; the wrapper fails closed when it is
+missing instead of silently using a guessed directory. Do not enable Preview
+and the corresponding formal/legacy writer for the same destination together.
+
 ## `no_agent` jobs
 
 Use the installed relative script paths:

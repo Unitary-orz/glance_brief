@@ -54,20 +54,44 @@
   },
   "runtime_adapters": {
     "hermes": {
+      "kind": "formal-batch",
+      "config_schema_version": 2,
       "scripts_dir": "scripts/glance-brief",
       "data_dir": "data/glance-brief",
+      "jobs_file": "cron/jobs.json"
+    },
+    "hermes-preview": {
+      "kind": "preview-agent-handoff",
+      "config_schema_version": 3,
+      "scripts_dir": "scripts/glance-brief-v2",
+      "data_dir": "data/glance-brief-v2",
       "jobs_file": "cron/jobs.json"
     }
   },
   "preview_runtime": {
     "source_root": "runtime/preview",
-    "entrypoints": [
-      "runtime/preview/entrypoints/noon_preview.py",
-      "runtime/preview/entrypoints/agents_preview.py"
-    ],
+    "lib_source": "runtime/preview/lib/glance_brief",
+    "entrypoints": {
+      "agents-report": {
+        "source": "runtime/preview/entrypoints/agents_preview.py",
+        "installed": "entrypoints/agents_preview.py",
+        "cron_entrypoint": "agents-v2.py"
+      },
+      "noon-news": {
+        "source": "runtime/preview/entrypoints/noon_preview.py",
+        "installed": "entrypoints/noon_preview.py",
+        "cron_entrypoint": "noon-v2.py"
+      }
+    },
+    "cron_prompts": {
+      "agents-report": "runtime/preview/cron/agents-handoff.md",
+      "noon-news": "runtime/preview/cron/noon-handoff.md"
+    },
     "config_template": "config/brief.preview.example.json",
+    "config_target": "brief.preview.example.json",
+    "runtime_config_target": "brief-live.json",
     "offline_fixture": "tests/fixtures/pipeline/preview-snapshot.json",
     "test": "runtime/preview/tests/test_preview_productization.py",
-    "deployment_note": "Preview runtime is source-owned but not installed or wired to formal jobs by this manifest"
+    "deployment_note": "Explicit opt-in only: install maps this source tree to scripts/glance-brief-v2; it never edits Cron jobs or live delivery settings"
   }
 }
