@@ -41,6 +41,15 @@ producer JSON
 
 配置只允许受控 `json_file` 和 argv 形式的 `command_json` 来源；必选来源、板块候选下限、最终选择上下限和数据质量均由程序 hard gate。失败时保留诊断和 manifest，不生成可投递报告。
 
+### 当前 V2 Preview 的源码边界
+
+已验证的 V2 Preview 不再藏在 `~/.hermes/scripts/glance-brief-v2` 这一份
+runtime 副本里；可重建源码统一收在 [`runtime/preview/`](runtime/preview/)。
+该目录包含两个入口、V2 core、Prompt、schema-v3 配置样例、离线 snapshot
+和解耦回归测试。V2 通过注册式 `snapshot_json` input adapter 让多个来源
+查看同一份不可变输入；`report_json` 只作兼容别名。当前只同步源码和契约，
+不自动修改正式包、Cron、投递或 live runtime。
+
 详见：
 
 - [架构](docs/architecture.md)

@@ -11,7 +11,9 @@
   ↓
 producer / prefetch（来源调用、重试、原始 JSON）
   ↓
-bounded adapters（json_file / command_json）
+bounded input adapters（json_file / command_json / snapshot_json）
+  ↓
+source view + normalization（每个来源只看到自己的 snapshot 路径）
   ↓
 immutable candidate registry（事实与 provenance）
   ↓
@@ -69,6 +71,23 @@ runtime adapter / delivery
 ### Runtime adapter
 
 只负责本地路径、配置、模型/provider、Cron 时间、投递目标、锁和超时。真实 Job ID、聊天 ID、凭据和用户配置不得进入仓库。
+
+## V2 Preview 的 source-owned 边界
+
+当前已验证的 V2 Preview 暂不覆盖正式 `glance_brief/` v0.3.0 包，而是
+完整保存在 `runtime/preview/`。这是 live V2 的可重建源码边界，包含
+入口、共享 core、Prompt、schema-v3 配置样例、离线 snapshot 和边界测试；
+正式 installer 只记录其来源位置，不会自动安装或改写现有 Cron。
+
+V2 的来源输入分为三类：`json_file` 和 `command_json` 负责得到一个独立
+payload，`snapshot_json` 只返回报告已加载的不可变 snapshot。所有来源都
+经同一个注册表进入 `load_source`，再由映射层规范化；assembler 不再针对
+`report_json` 写来源分支。`report_json` 仅保留为兼容别名，新的配置使用
+`snapshot_json`。
+
+Wrapper 只负责运行 producer、锁、路径和 handoff；required source、最小候选
+数和质量门禁由 Report Plan/core 统一执行。来源专用的 local-radar 发布物
+解析位于 `local_radar_publication.py`，不再散落在入口 wrapper。
 
 ## 版本与协议
 

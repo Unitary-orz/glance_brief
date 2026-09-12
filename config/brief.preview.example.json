@@ -1,0 +1,241 @@
+{
+  "schema_version": 3,
+  "sources": {
+    "rss_summary": {
+      "driver": "snapshot_json",
+      "items_path": "rss_summary.items",
+      "channel_id": "news-summary",
+      "channel_label": "NS",
+      "required": true,
+      "map": {
+        "title": "title",
+        "text": "description",
+        "links": [
+          {
+            "role": "article",
+            "label_path": "source",
+            "path": "link"
+          }
+        ]
+      }
+    },
+    "news_aggregator": {
+      "driver": "snapshot_json",
+      "items_path": "news_aggregator.items",
+      "channel_id": "news-aggregator",
+      "channel_label": "NA",
+      "required": true,
+      "exclude": {
+        "source": ["GitHub Trending"]
+      },
+      "map": {
+        "title": "title",
+        "text": ["summary", "title"],
+        "published_at": "time",
+        "extra": {
+          "source": "source"
+        },
+        "links": [
+          {
+            "role": "article",
+            "label_path": "source",
+            "path": "url"
+          }
+        ]
+      }
+    },
+    "aihot": {
+      "driver": "snapshot_json",
+      "items_path": "aihot.items",
+      "channel_id": "aihot",
+      "channel_label": "AIHOT",
+      "required": true,
+      "map": {
+        "title": "title",
+        "text": "summary",
+        "published_at": "published_at",
+        "extra": {
+          "category": "category"
+        },
+        "links": [
+          {
+            "role": "item",
+            "label": "AIHOT",
+            "path": "links.aihot"
+          },
+          {
+            "role": "original",
+            "label_path": "source",
+            "path": "links.original"
+          }
+        ]
+      }
+    },
+    "open_source_radar": {
+      "driver": "snapshot_json",
+      "items_path": "local_radar.signals.hot_today",
+      "channel_id": "github",
+      "channel_label": "GitHub",
+      "required": true,
+      "map": {
+        "title": "full_name",
+        "text": "description",
+        "strip_urls_from_text": true,
+        "extra": {
+          "full_name": "full_name",
+          "description": "description",
+          "stars_today": "stars_today",
+          "is_fresh_hot": "is_fresh_hot",
+          "language": "language",
+          "topics": "topics"
+        },
+        "links": [
+          {
+            "role": "repository",
+            "label_path": "full_name",
+            "path": "url"
+          }
+        ]
+      },
+      "snapshot": {
+        "fresh_hot": "local_radar.signals.fresh_hot",
+        "local_report_categories": "local_radar.local_report_categories",
+        "new_projects": "local_radar.signals.new_projects",
+        "publication": "local_radar.publication",
+        "quality": "local_radar.quality"
+      }
+    },
+    "codex_radar": {
+      "driver": "snapshot_json",
+      "items_path": "codexradar.selected",
+      "channel_id": "codexradar",
+      "channel_label": "CodexRadar",
+      "required": true,
+      "map": {
+        "title": "model",
+        "text": "effort"
+      },
+      "snapshot": {
+        "markdown": "codexradar.markdown"
+      }
+    }
+  },
+  "reports": {
+    "noon-news": {
+      "profile_type": "news_digest",
+      "title": "今日热点简报",
+      "input": {
+        "driver": "json_file",
+        "path": "../tests/fixtures/pipeline/preview-snapshot.json"
+      },
+      "features": {
+        "top_points": {
+          "max": 5,
+          "max_per_section": 2
+        },
+        "total_selection_limit": {
+          "max": 6
+        }
+      },
+      "components": [
+        {
+          "id": "international",
+          "order": 1,
+          "title": "国际要闻",
+          "kind": "editorial_items",
+          "editorial_hint": "国际冲突、外交和跨国事件",
+          "bindings": [{"source": "rss_summary", "take": 2}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"selection_limit": {"min": 1, "max": 2}}
+        },
+        {
+          "id": "macro_business",
+          "order": 2,
+          "title": "宏观与商业",
+          "kind": "editorial_items",
+          "editorial_hint": "宏观经济、商业和政策影响",
+          "bindings": [{"source": "news_aggregator", "match": {"source": ["Example Business"]}, "take": 2}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"selection_limit": {"min": 1, "max": 2}}
+        },
+        {
+          "id": "technology_society",
+          "order": 3,
+          "title": "科技与社会",
+          "kind": "editorial_items",
+          "editorial_hint": "科技影响社会、公共安全、健康、环境和日常生活的事件",
+          "bindings": [{"source": "news_aggregator", "match": {"source": ["Example Technology"]}, "take": 2}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"selection_limit": {"min": 1, "max": 2}}
+        },
+        {
+          "id": "ai",
+          "order": 4,
+          "title": "AI 主线",
+          "kind": "editorial_items",
+          "editorial_hint": "人工智能模型、产品、研究和产业进展",
+          "bindings": [{"source": "aihot", "take": 2}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"selection_limit": {"min": 1, "max": 2}}
+        }
+      ]
+    },
+    "agents-report": {
+      "profile_type": "ecosystem_digest",
+      "title": "agents-radar 生态报告",
+      "input": {
+        "driver": "json_file",
+        "path": "../tests/fixtures/pipeline/preview-snapshot.json"
+      },
+      "features": {},
+      "components": [
+        {
+          "id": "ai_ecosystem",
+          "order": 1,
+          "title": "AI 生态动态",
+          "kind": "semantic_clusters",
+          "editorial_hint": "按事件、进展或明确互补主题聚类 AI 生态变化",
+          "bindings": [{"source": "aihot", "take": 2}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"max_items": 2, "max_candidates_per_item": 2, "coverage_target": 2}
+        },
+        {
+          "id": "codexradar",
+          "order": 2,
+          "title": "CodexRadar 智力效率",
+          "kind": "producer_markdown",
+          "editorial_hint": "保留 producer 生成的已校验板块",
+          "bindings": [{"source": "codex_radar", "take": 2}],
+          "health": {"minimum_candidates": 0},
+          "policy": {"snapshot_key": "markdown"}
+        },
+        {
+          "id": "open_source_trends",
+          "order": 3,
+          "title": "开源热点趋势",
+          "kind": "semantic_synthesis",
+          "editorial_hint": "综合热门与新热门项目，提炼跨项目趋势",
+          "bindings": [{"source": "open_source_radar", "take": 3}],
+          "health": {"minimum_candidates": 1},
+          "policy": {"exact_items": 2}
+        },
+        {
+          "id": "open_source_board",
+          "order": 4,
+          "title": "最热门开源",
+          "kind": "project_board",
+          "editorial_hint": "按 producer 分类展示程序锁定的项目榜",
+          "bindings": [{"source": "open_source_radar", "take": 3}],
+          "health": {"minimum_candidates": 1},
+          "policy": {
+            "fresh_snapshot_key": "fresh_hot",
+            "categories_snapshot_key": "local_report_categories",
+            "quality_snapshot_key": "quality",
+            "max_projects_per_category": 3,
+            "fresh_title": "新热门开源"
+          }
+        }
+      ]
+    }
+  }
+}

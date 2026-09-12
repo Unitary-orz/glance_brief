@@ -1,0 +1,161 @@
+{
+  "rss_summary": {
+    "items": [
+      {
+        "title": "International representatives issue joint statement",
+        "description": "International representatives issued a joint statement on maritime research cooperation.",
+        "source": "Example Wire",
+        "link": "https://example.com/preview/international/joint-statement"
+      }
+    ]
+  },
+  "news_aggregator": {
+    "items": [
+      {
+        "title": "示例企业发布季度经营说明",
+        "summary": "企业发布季度经营说明，内容仅用于 Preview 的离线合同测试。",
+        "source": "Example Business",
+        "time": "2026-08-30T02:00:00Z",
+        "url": "https://example.com/preview/business/quarterly-update"
+      },
+      {
+        "title": "示例科技项目发布公共安全更新",
+        "summary": "科技项目发布公共安全更新，说明将改善用户的日常使用流程。",
+        "source": "Example Technology",
+        "time": "2026-08-30T02:30:00Z",
+        "url": "https://example.com/preview/technology/safety-update"
+      },
+      {
+        "title": "示例项目出现在不应使用的来源",
+        "summary": "这条记录验证 source exclude 在 take 之前生效。",
+        "source": "GitHub Trending",
+        "time": "2026-08-30T02:45:00Z",
+        "url": "https://example.com/preview/excluded"
+      }
+    ]
+  },
+  "aihot": {
+    "items": [
+      {
+        "title": "示例智能体工具增加可审计流程能力",
+        "summary": "智能体工具增加可审计流程能力，便于人工复核协作步骤。",
+        "category": "ai",
+        "published_at": "2026-08-30T03:00:00Z",
+        "source": "Example AI Lab",
+        "links": {
+          "aihot": "https://example.com/preview/ai/item/agent-audit-workflow",
+          "original": "https://example.com/preview/ai/original/agent-audit-workflow"
+        }
+      },
+      {
+        "title": "示例研究团队发布工具调用评测说明",
+        "summary": "研究团队发布工具调用评测说明，用于验证统一来源适配边界。",
+        "category": "ai",
+        "published_at": "2026-08-30T03:30:00Z",
+        "source": "Example Research",
+        "links": {
+          "aihot": "https://example.com/preview/ai/item/tool-use-evaluation",
+          "original": "https://example.com/preview/ai/original/tool-use-evaluation"
+        }
+      }
+    ]
+  },
+  "local_radar": {
+    "signals": {
+      "hot_today": [
+        {
+          "full_name": "fixture-labs/agent-workflow",
+          "url": "https://github.com/fixture-labs/agent-workflow",
+          "description": "A composable agent workflow toolkit.",
+          "stars_today": 42,
+          "is_fresh_hot": true,
+          "language": "Python",
+          "topics": ["agents", "workflow"]
+        },
+        {
+          "full_name": "fixture-labs/eval-kit",
+          "url": "https://github.com/fixture-labs/eval-kit",
+          "description": "An evaluation toolkit for local AI systems.",
+          "stars_today": 17,
+          "is_fresh_hot": false,
+          "language": "Python",
+          "topics": ["evaluation"]
+        },
+        {
+          "full_name": "fixture-labs/local-router",
+          "url": "https://github.com/fixture-labs/local-router",
+          "description": "A local model routing utility.",
+          "stars_today": 9,
+          "is_fresh_hot": false,
+          "language": "TypeScript",
+          "topics": ["routing"]
+        }
+      ],
+      "fresh_hot": [
+        {
+          "full_name": "fixture-labs/agent-workflow",
+          "url": "https://github.com/fixture-labs/agent-workflow"
+        }
+      ],
+      "new_projects": []
+    },
+    "local_report_categories": [
+      {
+        "name": "🤖 AI 智能体/工作流",
+        "projects": ["fixture-labs/agent-workflow"]
+      },
+      {
+        "name": "🧪 评测与基础设施",
+        "projects": ["fixture-labs/eval-kit", "fixture-labs/local-router"]
+      }
+    ],
+    "quality": {
+      "ok": true,
+      "errors": [],
+      "candidate_count": 3
+    },
+    "publication": {
+      "trends": [
+        "Agent 工具链持续升温。",
+        "本地化与协同编排受关注。"
+      ],
+      "fresh_hot": [
+        {
+          "full_name": "fixture-labs/agent-workflow",
+          "description": "面向 AI 工作流的工具。"
+        }
+      ],
+      "categories": [
+        {
+          "name": "🤖 AI 智能体/工作流",
+          "projects": [
+            {
+              "full_name": "fixture-labs/agent-workflow",
+              "description": "多 agent 协同的源码管控。"
+            }
+          ]
+        },
+        {
+          "name": "🧪 评测与基础设施",
+          "projects": [
+            {
+              "full_name": "fixture-labs/eval-kit",
+              "description": "用于本地 AI 系统的评测工具。"
+            },
+            {
+              "full_name": "fixture-labs/local-router",
+              "description": "用于本地模型路由的工具。"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "codexradar": {
+    "selected": [
+      {"model": "fixture-alpha", "effort": "high"},
+      {"model": "fixture-beta", "effort": "high"}
+    ],
+    "markdown": "**🧠 CodexRadar 智力效率**\n\n- ① 智力Top2：`fixture-alpha high`（IQ 100.0 · 2.0m · $0.02） > `fixture-beta high`（IQ 80.0 · 1.0m · $0.01）\n- ② 均衡Top2：`fixture-beta high`（IQ 80.0 · 1.0m · $0.01） > `fixture-alpha high`（IQ 100.0 · 2.0m · $0.02）\n- ③ 性价比Top3：`fixture-alpha high`（IQ 100.0 · 2.0m · $0.02） > `fixture-beta high`（IQ 80.0 · 1.0m · $0.01）\n- ④ 其他：无"
+  }
+}

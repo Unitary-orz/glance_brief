@@ -58,5 +58,16 @@
       "data_dir": "data/glance-brief",
       "jobs_file": "cron/jobs.json"
     }
+  },
+  "preview_runtime": {
+    "source_root": "runtime/preview",
+    "entrypoints": [
+      "runtime/preview/entrypoints/noon_preview.py",
+      "runtime/preview/entrypoints/agents_preview.py"
+    ],
+    "config_template": "config/brief.preview.example.json",
+    "offline_fixture": "tests/fixtures/pipeline/preview-snapshot.json",
+    "test": "runtime/preview/tests/test_preview_productization.py",
+    "deployment_note": "Preview runtime is source-owned but not installed or wired to formal jobs by this manifest"
   }
 }

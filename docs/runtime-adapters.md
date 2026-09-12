@@ -4,7 +4,7 @@
 
 The shared `glance_brief/` package is runtime-independent. It owns:
 
-- bounded `json_file` and argv-based `command_json` source loading;
+- bounded `json_file`, argv-based `command_json`, and shared-snapshot `snapshot_json` input drivers;
 - immutable candidates and provenance;
 - lean model prompts;
 - model-response validation and hard gates;
@@ -70,6 +70,22 @@ shared CLI does not select a Hermes provider.
 This mode is intended for isolated Preview/Shadow Cron validation first. Adding a
 Preview does not authorize replacing the installed `no_agent: true` jobs or the
 formal Cron definitions; production cutover remains a separate change.
+
+## V2 Preview source tree
+
+The current verified V2 runtime is source-owned under `runtime/preview/`. Its
+entrypoints, shared core, Prompt files, schema-v3 example, immutable offline
+fixture, and productization tests are versioned together. The entrypoints use
+`GLANCE_BRIEF_PREVIEW_*` environment variables for deployment-specific paths;
+no Hermes home, live Cron ID, delivery target, credential, or generated snapshot
+is committed.
+
+The `snapshot_json` input driver is the explicit bridge from one report input
+to multiple source views. `report_json` remains a compatibility alias only.
+Source health is evaluated by the configured Report Plan after each source has
+been attempted, so a failed source is recorded and isolated before the required
+component gate decides whether the report may render. The local-radar Markdown
+bridge lives in the source adapter module rather than in the wrapper.
 
 ## OpenClaw: contract only in v0.3.0
 

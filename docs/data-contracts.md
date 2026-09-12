@@ -77,6 +77,21 @@ aihot
 
 不支持 shell string、动态 import、HTTP driver、模板 DSL 或 legacy converter。
 
+## V2 Preview source input schema 3
+
+`runtime/preview/` 的 schema 3 在保留 `json_file`、`command_json` 安全边界的
+基础上增加 `snapshot_json`：报告的 `input` 由 core 只读取一次，所有声明
+`driver: snapshot_json` 的来源通过注册式 input adapter 查看该 payload，
+再按各自的 `items_path` 和 `map` 规范化。assembler 不识别具体来源 driver
+来分支；`report_json` 仅为旧 live 配置提供兼容别名，新配置必须写
+`snapshot_json`。来源读取错误先按 source 记录并隔离，Report Plan 的
+`required` 与 `minimum_candidates` 再统一决定是否 hard fail。
+
+V2 Preview 的可执行入口、Prompt、fixture 和测试位于
+`runtime/preview/{entrypoints,lib,tests}`，样例配置为
+`config/brief.preview.example.json`；这些文件不包含 live 路径、凭据、投递
+ID 或生成产物。
+
 ## Candidate registry
 
 每个 canonical candidate 至少包含：
