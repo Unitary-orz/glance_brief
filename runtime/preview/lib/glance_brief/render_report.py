@@ -308,7 +308,7 @@ def _render_noon(
     for index, point in enumerate(semantic["top_points"], 1):
         topic = _inline(point["topic"], f"top_points[{index - 1}].topic")
         fact = _inline(point["fact"], f"top_points[{index - 1}].fact")
-        lines.append(f"{index}. {topic}：{fact}")
+        lines.append(f"{index}. **{topic}**：{fact}")
     lines.extend(["", "### 分类详情", ""])
     for section_index, section_id in enumerate(section_ids):
         definition = definitions[section_id]

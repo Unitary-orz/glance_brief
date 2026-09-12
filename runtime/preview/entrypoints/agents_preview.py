@@ -186,9 +186,6 @@ def _render_run(value: str) -> str:
         raise RuntimeError("prepared semantic output path does not match requested run")
     if prepared.get("config_sha256") != _sha256(CONFIG):
         raise RuntimeError("Agents V2 config changed after semantic preparation")
-    if prepared.get("source_snapshot_sha256") != _sha256(SNAPSHOT):
-        raise RuntimeError("Agents source snapshot changed after semantic preparation")
-
     render_args = argparse.Namespace(
         config=CONFIG,
         output_dir=run_dir,

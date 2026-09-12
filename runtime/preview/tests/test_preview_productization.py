@@ -13,7 +13,7 @@ CONFIG_PATH = REPO_ROOT / "config" / "brief.preview.example.json"
 
 sys.path.insert(0, str(PREVIEW_ROOT / "lib"))
 
-from glance_brief import adapters, contracts, resolve, source_inputs  # noqa: E402
+from glance_brief import adapters, contracts, render_report, resolve, source_inputs  # noqa: E402
 
 
 class PreviewInputAdapterTests(unittest.TestCase):
@@ -70,8 +70,8 @@ class PreviewInputAdapterTests(unittest.TestCase):
         prompt = (PREVIEW_ROOT / "lib" / "glance_brief" / "prompts" / "noon-news.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("4–6 字为首选", prompt)
-        self.assertIn("7 字可接受", prompt)
+        self.assertIn("默认 4–6 字", prompt)
+        self.assertIn("只有删去第 7 个字会损失", prompt)
         self.assertIn("8 字仅作兼容上限", prompt)
 
         noon = adapters.assemble_report(self.config, contracts.NOON_REPORT, CONFIG_PATH.parent)
@@ -105,6 +105,22 @@ class PreviewInputAdapterTests(unittest.TestCase):
         topic_warnings = [warning for warning in warnings if warning.get("code") == "top_point_topic_length"]
         self.assertEqual(len(topic_warnings), 1)
         self.assertEqual(topic_warnings[0]["characters"], 7)
+        markdown = render_report.render_report(
+            resolved,
+            section_definitions=noon["section_definitions"],
+            report_plan=noon["report_plan"],
+        )
+        self.assertIn("1. **英伟达百亿入股**：", markdown)
+
+    def test_agents_topic_is_a_trend_point_not_a_category_label(self) -> None:
+        prompt = (PREVIEW_ROOT / "lib" / "glance_brief" / "prompts" / "agents-report.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("趋势点短结论", prompt)
+        self.assertIn("不是板块或分类标签", prompt)
+        self.assertIn("英伟达入股AI", prompt)
+        self.assertIn("AI安全威胁", prompt)
+        self.assertIn("renderer 报 summary 超长时，只压缩报错字段后重试", prompt)
 
     def test_one_bad_source_isolated_until_the_configured_health_gate(self) -> None:
         config = copy.deepcopy(self.config)
