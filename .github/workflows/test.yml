@@ -27,6 +27,12 @@ jobs:
       - name: Run complete offline test suite
         run: python -m unittest discover -s tests -p 'test_*.py' -v
 
+      - name: Run local open-source radar producer tests
+        run: python -m unittest discover -s producers/local-open-source-radar/tests -p 'test_*.py' -v
+
+      - name: Run V2 production runtime contract tests
+        run: python -m unittest discover -s runtime/preview/tests -p 'test_*.py' -v
+
       - name: Run static release gate
         run: python tests/release_gate.py
 
@@ -43,6 +49,18 @@ jobs:
             --dry-run
           test ! -e "$prefix/scripts/glance-brief"
           test ! -e "$prefix/data/glance-brief"
+
+      - name: Verify V2 installer dry-run
+        run: |
+          prefix="$(mktemp -d)"
+          result="$(python install/install.py install \
+            --runtime hermes-preview \
+            --components agents-report,noon-news \
+            --prefix "$prefix" \
+            --dry-run)"
+          python -c 'import json, sys; data=json.loads(sys.stdin.read()); assert data["dry_run"] is True; assert data["plan"]["runtime_kind"] == "preview-agent-handoff"; assert data["components"] == ["agents-report", "noon-news"]' <<< "$result"
+          test ! -e "$prefix/scripts/glance-brief-v2"
+          test ! -e "$prefix/data/glance-brief-v2"
 
       - name: Build and install wheel
         run: |

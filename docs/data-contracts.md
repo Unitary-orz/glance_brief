@@ -20,14 +20,18 @@ Producer 只负责采集和原始事实，不输出最终 Markdown。现有 pref
 }
 ```
 
-### agents-report 来源
+## agents-report 来源
+
+schema 2 legacy 与 V2 production 的 agents 输入都通过显式 `local_radar`
+publication 视图接入；两条 runtime 线各自负责 adapter 与 artifacts。
 
 ```text
-agents_radar
+local_radar
   ok
-  stdout
-  selected_blocks
-  open_source_quality
+  report_date
+  quality
+  signals
+  local_report_categories
 aihot
   items[]
 codexradar
@@ -41,12 +45,51 @@ generated_at
 
 - AI HOT 条目链接、来源和分类取自原始字段；
 - CodexRadar Markdown 是 producer-owned block，验证后逐字插入；
+- `signals.hot_today`、`signals.fresh_hot` 和 `local_report_categories` 均来自程序校验后的 publication；模型不重算分类或项目事实。
 - 开源雷达必须提供 `quality.ok`、`hot_today`、`fresh_hot`、`local_report_categories`；
 - `fresh_hot` 是 `hot_today` 的唯一子集，分类唯一完整覆盖 hot；最终报告的每个 `fresh_hot` 项目还携带其程序确定的分类标签，分类榜仍可重复展示该项目；
 - Star 展示统一使用 `stars_today`（GitHub Trending 原始日增量）；`stars_delta` 仅用于本地快照差值和排序，不得渲染为 `★/日`；
 - GitHub URL 必须与 `owner/repo` 身份一致。
 
-### noon-news 来源
+## local-open-source-radar
+
+独立 producer 发布当天的结构化 GitHub 快照，报告 runtime 只消费已发布
+publication，不重新采集，也不从渲染后的报告反推事实。publication 的核心
+结构为：
+
+```text
+schema_version: 1
+report_date
+generated_at
+quality
+  ok
+signals
+  hot_today[]
+  fresh_hot[]
+  new_projects[]
+candidates[]
+diagnostics
+  selection
+    full_selection_pool_count
+categories
+category_definitions[]
+```
+
+`hot_today` 是完整 ranked pool 按热度上限选出的当前热门项目；`fresh_hot`
+必须是 `hot_today` 的子集；每个项目的 GitHub URL 必须精确匹配其
+`owner/repo`。`full_selection_pool_count` 记录完整 ranked pool 的规模，不能
+用受 artifact cap 截断后的列表冒充选择池。`categories` 是稳定的结构化
+分类映射；legacy reader 可将它规范化为 `local_report_categories`，并要求
+无重复地完整覆盖 `hot_today`。
+
+producer 的 publication 只提供项目事实、信号和诊断，不提供最终报告
+Markdown。独立 radar Prompt 可以生成 `**✨ 本期新入榜**` 版块，并在“今日热门”分类中按
+“最热”与“其他”两行规则排版；但主
+`agents-report` 的 Prompt 不能把该版块混入主报告；主报告的
+`**✨新热门开源**` 标题与版式由各自 renderer 根据程序确定的
+`open_source_display_ids` 生成。
+
+## noon-news
 
 ```text
 news_aggregator
@@ -77,7 +120,7 @@ aihot
 
 不支持 shell string、动态 import、HTTP driver、模板 DSL 或 legacy converter。
 
-## V2 Preview source input schema 3
+## V2 production source input schema 3
 
 `runtime/preview/` 的 schema 3 在保留 `json_file`、`command_json` 安全边界的
 基础上增加 `snapshot_json`：报告的 `input` 由 core 只读取一次，所有声明
@@ -87,7 +130,7 @@ aihot
 `snapshot_json`。来源读取错误先按 source 记录并隔离，Report Plan 的
 `required` 与 `minimum_candidates` 再统一决定是否 hard fail。
 
-V2 Preview 的可执行入口、Prompt、fixture 和测试位于
+V2 production 的可执行入口、Prompt、fixture 和测试位于
 `runtime/preview/{entrypoints,lib,tests}`，样例配置为
 `config/brief.preview.example.json`；这些文件不包含 live 路径、凭据、投递
 ID 或生成产物。

@@ -31,6 +31,7 @@ GITHUB_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 PROJECT_BULLET_RE = re.compile(
     r"^\s*-\s*(?P<label>热门项目|其他项目)\s*[：:]\s*(?P<body>.*)$"
 )
+RENDERED_CATEGORY_RE = re.compile(r"^[①②③④⑤⑥⑦⑧⑨⑩]\s+\S")
 
 
 def load_quality_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
@@ -280,8 +281,23 @@ def validate_rendered_report(
     current_category = "未识别分类"
     project_lines: list[dict[str, Any]] = []
     other_lines: list[dict[str, Any]] = []
+    hot_line_counts: dict[str, int] = {}
 
     for line_number, line in enumerate(section.splitlines(), start=1):
+        stripped = line.strip()
+        if RENDERED_CATEGORY_RE.match(stripped):
+            current_category = stripped
+            continue
+
+        if "新项目发现" in stripped or "🆕 新发现" in stripped:
+            warnings.append(
+                {
+                    "code": "new_discovery_section_forbidden",
+                    "line": line_number,
+                    "message": "主报告不得生成“新项目发现”或“🆕 新发现”区域。",
+                }
+            )
+
         match = PROJECT_BULLET_RE.match(line)
         if match:
             label = match.group("label")
@@ -319,6 +335,18 @@ def validate_rendered_report(
             }
             project_lines.append(item)
 
+            if label == "热门项目":
+                hot_line_counts[current_category] = hot_line_counts.get(current_category, 0) + 1
+                if hot_line_counts[current_category] > 1:
+                    warnings.append(
+                        {
+                            "code": "category_hot_projects_too_many",
+                            "category": current_category,
+                            "line": line_number,
+                            "message": f"{current_category} 只能保留一个热门项目。",
+                        }
+                    )
+
             if invalid_links:
                 warnings.append(
                     {
@@ -348,6 +376,14 @@ def validate_rendered_report(
 
             if label == "其他项目":
                 other_lines.append(item)
+                warnings.append(
+                    {
+                        "code": "other_project_section_forbidden",
+                        "category": current_category,
+                        "line": line_number,
+                        "message": "主报告不得生成“其他项目”行。",
+                    }
+                )
                 if apparent_count > rules["other_projects_max"]:
                     warnings.append(
                         {
@@ -364,7 +400,6 @@ def validate_rendered_report(
                     )
             continue
 
-        stripped = line.strip()
         if (
             stripped
             and not stripped.startswith(("-", "**", "📡", "---", "①", "②"))

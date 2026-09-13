@@ -1,9 +1,11 @@
-# V2 Preview runtime source boundary
+# V2 production runtime source boundary
 
-This directory is the repository-owned, rebuildable source for the currently
-verified V2 Preview runtime. It is intentionally separate from the formal
-`glance_brief/` v0.3.0 package until the two output contracts are deliberately
-merged.
+This directory is the repository-owned, rebuildable source for the current V2
+production runtime. The directory name `preview` is retained as a historical
+compatibility name for the installer and existing deployment paths; it does not
+mean that the active V2 writer is still a shadow deployment. It is intentionally
+separate from the schema 2 legacy `glance_brief/` package so the two runtime
+lines cannot silently overwrite each other's config, artifacts, or jobs.
 
 ```text
 entrypoints/
@@ -75,12 +77,12 @@ directory. The default reasoning metadata is `medium`, matching the currently
 verified Cron setting, and may be overridden only by an explicit deployment
 environment value.
 
-The active Hermes copy under `~/.hermes/scripts/glance-brief-v2` is still a
-separate installed runtime. Installing the repository Preview is not a
-production cutover: before enabling jobs, inspect all enabled writers for the
-same report and destination, preserve the old runtime/job records, and choose
-one writer per report. Rollback restores the saved runtime tree and scheduler
-records together.
+The active Hermes copy under `~/.hermes/scripts/glance-brief-v2` is a separate
+installed runtime. Installing or updating this repository mapping does not itself
+perform a production cutover: before changing jobs, inspect all enabled writers
+for the same report and destination, preserve the old runtime/job records, and
+choose one writer per report. Rollback restores the saved runtime tree and
+scheduler records together.
 
 ## Verification
 

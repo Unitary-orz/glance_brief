@@ -49,7 +49,7 @@ Each report entry point is a complete batch application:
 The shared `glance_brief` package does not import Hermes or select a provider.
 Hermes-specific model invocation exists only in the installed runtime entry point.
 
-The explicit V2 Preview mode maps the source-owned tree through
+The current V2 production agent-handoff mode maps the source-owned tree through
 `python3 install/install.py install --runtime hermes-preview` to:
 
 ```text
@@ -71,12 +71,13 @@ home. The installer records the repository `source_revision`, dirty-state
 marker, and hashes for every owned file. It does not create, disable, or update
 Cron jobs.
 
-Preview jobs are outer-Agent handoff jobs (`no_agent: false`) and must use the
+V2 jobs are outer-Agent handoff jobs (`no_agent: false`) and must use the
 prompt printed by the installer or `adapters/hermes/jobs.preview.example.json`.
 The Agents job must set `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR` explicitly to the
 already-published local-radar directory; the wrapper fails closed when it is
-missing instead of silently using a guessed directory. Do not enable Preview
-and the corresponding formal/legacy writer for the same destination together.
+missing instead of silently using a guessed directory. The `hermes-preview` name
+is historical; do not enable the V2 writer and the corresponding schema 2 legacy
+writer for the same destination together.
 
 ## `no_agent` jobs
 
@@ -124,6 +125,7 @@ it bypasses the model adapter and must not be configured on production jobs.
 Producer and utility settings remain runtime-owned, including:
 
 ```text
+LOCAL_OPEN_SOURCE_RADAR_READER   # schema 2 legacy path only
 AGENTS_RADAR_COLLECTOR
 AGENTS_RADAR_OUTPUT_DIR
 AGENTS_RADAR_QUALITY_CONFIG
@@ -133,8 +135,10 @@ NEWS_AGGREGATOR_SCRIPT
 NEWS_SUMMARY_SCRIPT
 ```
 
-External news skills are installed separately. The installer reports missing
-ones as warnings and does not fetch them automatically.
+The V2 Agents path consumes the explicitly configured publication directory
+instead of guessing a reader path. External news skills are installed
+separately. The installer reports missing ones as warnings and does not fetch
+them automatically.
 
 ## Verification
 

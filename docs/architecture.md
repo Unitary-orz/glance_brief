@@ -2,7 +2,7 @@
 
 ## 目标
 
-把来源事实、模型语义和最终格式分开，使两份日报可追溯、可回放、可在不同 Agent runtime 中运行，并在任一契约失败时 fail closed。
+把来源事实、模型语义和最终格式分开，使 V2 的两份日报可追溯、可回放、可在不同 Agent runtime 中运行；schema 2 legacy 线保留兼容与回滚用途，并在任一契约失败时 fail closed。
 
 ## 数据流
 
@@ -46,6 +46,15 @@ runtime adapter / delivery
 
 不负责摘要、翻译或最终 Markdown。
 
+### 独立 local-open-source-radar producer
+
+`producers/local-open-source-radar/` 是独立的 GitHub 采集与分类 producer：它
+负责来源访问、筛选、排序、分类和当天 publication。根安装器不自动安装或创建
+它的 Cron；V2 Agents 通过 runtime 明确提供的
+`GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR` 消费已发布快照，schema 2 legacy 线
+则可通过 `LOCAL_OPEN_SOURCE_RADAR_READER` 使用兼容 reader。报告 core 不解析
+producer 的调度状态，也不从渲染后的独立报告反推事实。
+
 ### 模型
 
 只负责：
@@ -72,12 +81,13 @@ runtime adapter / delivery
 
 只负责本地路径、配置、模型/provider、Cron 时间、投递目标、锁和超时。真实 Job ID、聊天 ID、凭据和用户配置不得进入仓库。
 
-## V2 Preview 的 source-owned 边界
+## 当前 V2 生产 runtime 的 source-owned 边界
 
-当前已验证的 V2 Preview 暂不覆盖正式 `glance_brief/` v0.3.0 包，而是
-完整保存在 `runtime/preview/`。这是 live V2 的可重建源码边界，包含
-入口、共享 core、Prompt、schema-v3 配置样例、离线 snapshot、Cron handoff
-prompt 和边界测试。默认正式 installer 不会触碰它；显式使用
+当前正式生产使用的 V2 runtime 有意不与顶层 schema 2 legacy
+`glance_brief/` 包共享实现，而是完整保存在 `runtime/preview/`。其中
+`preview` 是历史兼容目录名，不表示当前 writer 仍是 shadow deployment。
+该目录包含入口、V2 core、Prompt、schema-v3 配置样例、离线 snapshot、Cron
+handoff prompt 和边界测试。默认 schema 2 installer 不会触碰它；显式使用
 `install/install.py install --runtime hermes-preview` 时，installer 按
 manifest 将完整依赖闭包映射到 `scripts/glance-brief-v2/`，记录 source
 revision/owned-file hashes，并仍然不自动修改 Cron 或投递。
@@ -97,7 +107,9 @@ Wrapper 只负责运行 producer、锁、路径和 handoff；required source、�
 - 仓库版本：`v0.3.0`；
 - producer 输入可继续使用 `schema_version: 1`，由 adapters 消化；
 - canonical / resolved 报告使用 `schema_version: 2`；
-- `glance_brief/` 是两份报告共用的正式业务包；
+- 顶层 `glance_brief/` 是 schema 2 legacy 业务包；
+- `runtime/preview/` 是当前 V2 production runtime 的可重建源码边界；
+- 两条运行线通过各自的 manifest、配置和 runtime adapter 隔离；
 - 不支持旧模型响应、legacy fixture、converter 或多协议运行分支。
 
 ## 运行约束

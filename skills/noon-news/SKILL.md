@@ -21,7 +21,11 @@ python3 -m glance_brief check --config config/brief.example.json
 python3 -m glance_brief probe --config config/brief.example.json --report noon-news
 ```
 
-Hermes 安装后使用 `glance-brief/noon-news.py`。该入口完成来源读取、一次模型调用、严格解析、resolver、确定性渲染和 artifacts；Cron 使用 `no_agent: true`，不再附加外层 Prompt。`no_agent` 只关闭外层 Agent，不表示无模型调用。
+两条运行线有意并存。schema 2 legacy 安装后使用
+`glance-brief/noon-news.py`；当前 V2 production 安装后使用历史兼容路径
+`glance-brief-v2/noon-v2.py`，完成一次来源快照、外层 Agent semantic handoff、
+严格 resolver、确定性渲染和 artifacts。V2 的 `hermes-preview` 只是安装器
+兼容名，不表示当前 writer 仍是 Preview。
 
 `noon_news_prefetch.py` 是可选 producer，不是最终报告入口，也不发送报告。
 

@@ -24,6 +24,7 @@ Existing producer/utility environment names remain part of the portability
 contract and may be used by a future adapter:
 
 ```text
+LOCAL_OPEN_SOURCE_RADAR_READER
 CODEXRADAR_CONFIG
 AGENTS_RADAR_OUTPUT_DIR
 AGENTS_RADAR_COLLECTOR

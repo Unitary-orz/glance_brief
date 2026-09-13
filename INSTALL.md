@@ -10,10 +10,17 @@ The installer is idempotent and stdlib-only. It copies project-owned files,
 preserves user config/state/output, records hashes, and reports scheduler changes.
 It never creates, edits, or removes jobs directly.
 
-## Supported runtime
+## Supported runtime modes
 
-The verified runtime adapter in v0.3.0 is **Hermes**. OpenClaw currently has an
-adapter contract only and intentionally advertises no runnable jobs.
+Hermes is verified in two intentionally separate modes:
+
+- `hermes` — retained schema 2 legacy batch runtime;
+- `hermes-preview` — current V2 production agent-handoff runtime. `preview` is a
+  historical installer/runtime name kept for compatibility; it does not mean the
+  installed V2 writer is still a shadow deployment.
+
+OpenClaw currently has an adapter contract only and intentionally advertises no
+runnable jobs.
 
 Hermes layout:
 
@@ -24,15 +31,22 @@ Hermes layout:
 
 ## Architecture boundary
 
-The shared `glance_brief` package is runtime-independent. It owns source
+The schema 2 `glance_brief` package is runtime-independent. It owns source
 assembly, model payload construction, response validation, resolution,
 deterministic rendering, artifacts, and replay. It never imports Hermes or
 selects a provider.
 
-The installed Hermes report entry point owns one model invocation and returns raw
-JSON to the shared core. The scheduler job therefore uses `no_agent: true`: this
-disables the outer scheduler Agent, not the model call inside the batch process.
-It is not a zero-token mode.
+The V2 production source tree is separately owned under `runtime/preview/` and
+contains its own schema 3 core, Report Plan and agent-handoff entry points. The
+repository keeps the schema 2 legacy line for compatibility and rollback; it is
+not the implementation used by the current V2 production writer.
+
+The installed schema 2 Hermes report entry point owns one model invocation and
+returns raw JSON to its core. Its scheduler job therefore uses `no_agent: true`:
+this disables the outer scheduler Agent, not the model call inside the batch
+process. The V2 production jobs use the separate agent-handoff path described
+below and must not be conflated with this legacy mode. Neither mode is a
+zero-token mode.
 
 ## Discovery before changes
 
@@ -97,7 +111,7 @@ Validate before creating jobs:
 Do not place credentials, shell strings, chat IDs, or delivery data in this file.
 `command_json` must remain an argv array with its explicit environment allowlist.
 
-## 3. Create approved Hermes jobs
+## 3. Create approved schema 2 legacy Hermes jobs
 
 Use Hermes' native scheduler interface and the `jobs_to_create` suggestions.
 Report scripts are relative to `$HERMES_HOME/scripts/`:
@@ -127,10 +141,12 @@ GLANCE_BRIEF_TIMEOUT
 Set schedule and delivery only from the user-approved values. Never commit real
 job IDs, chat IDs, credentials, or user model configuration.
 
-## 2A. Explicit V2 Preview runtime installation
+## 2A. Current V2 agent-handoff runtime (historical installer name)
 
 The V2 source-owned runtime is installed only by an explicit opt-in; the default
-`--runtime hermes` path above remains the formal schema 2 batch runtime.
+`--runtime hermes` path above remains the schema 2 legacy batch runtime. The
+explicit `hermes-preview` name is retained so existing deployment automation can
+be inspected and migrated without silently changing paths.
 
 ```bash
 python3 install/install.py install --runtime hermes-preview \
@@ -144,7 +160,7 @@ This maps the committed `runtime/preview/` tree to:
 <hermes-home>/scripts/glance-brief-v2/
   agents-v2.py, noon-v2.py       flat Cron entry points
   entrypoints/                    source entrypoint copies
-  lib/glance_brief/               complete Preview core + prompts
+  lib/glance_brief/               complete V2 core + prompts
   cron-prompts/                   self-contained handoff prompts
 <hermes-home>/data/glance-brief-v2/
   config/brief.preview.example.json
@@ -166,7 +182,7 @@ GLANCE_BRIEF_PREVIEW_PROVIDER
 GLANCE_BRIEF_PREVIEW_REASONING         # default medium
 ```
 
-Copy and customize the installed Preview example to `brief-live.json`, replace
+Copy and customize the installed V2 example to `brief-live.json`, replace
 fixture paths with production source paths, then validate it with:
 
 ```bash
@@ -175,12 +191,12 @@ fixture paths with production source paths, then validate it with:
 python3 install/install.py verify --runtime hermes-preview --prefix <hermes-home>
 ```
 
-Before creating Preview jobs, inspect the scheduler for the corresponding formal
-writers and choose exactly one writer per report and destination. Do not enable
-V2 alongside the old writer merely because both pass their own health checks.
-Keep the old runtime tree and exact job records until the first normal-schedule
-V2 run is accepted; rollback means restoring both from that backup. The sample
-mapping is also available at `adapters/hermes/jobs.preview.example.json`.
+Before creating V2 jobs, inspect the scheduler for the corresponding schema 2
+legacy writers and choose exactly one writer per report and destination. Do not
+enable both lines merely because each passes its own health checks. Keep the old
+runtime tree and exact job records until the current V2 schedule is accepted;
+rollback means restoring both from that backup. The sample mapping is also
+available at `adapters/hermes/jobs.preview.example.json`.
 
 ## 4. Verify
 

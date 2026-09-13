@@ -530,7 +530,6 @@ All context confirmed.
 
 🔧 AI 基础工具
 - 热门项目：[example/project](https://example.com/example/project)「简介」
-- 其他项目：无
 """
         rules = quality.load_quality_config()
         checked = quality.validate_rendered_report(report, rules)

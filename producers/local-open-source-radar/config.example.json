@@ -1,0 +1,362 @@
+{
+  "schema_version": 1,
+  "topics": [
+    "llm",
+    "ai-agent",
+    "rag",
+    "vector-database",
+    "large-language-model",
+    "machine-learning"
+  ],
+  "search": {
+    "active_days": 7,
+    "new_project_days": 30,
+    "new_project_min_stars": 20,
+    "per_page": 15,
+    "exclude_archived": true,
+    "exclude_forks": true,
+    "timeout_seconds": 20,
+    "attempts": 2
+  },
+  "quality": {
+    "min_trending_count": 5,
+    "min_search_result_count": 20
+  },
+  "state": {
+    "retention_days": 90
+  },
+  "technical_analysis": {
+    "enabled": true,
+    "cache_version": 3,
+    "max_projects": 3,
+    "timeout_seconds": 7,
+    "attempts": 1,
+    "cache_dir": "cache",
+    "max_file_chars": 6000,
+    "readme_excerpt_chars": 3000,
+    "evidence_file_limit": 2,
+    "max_manifest_files": 3,
+    "key_path_limit": 20,
+    "key_path_prefixes": [
+      "src/",
+      "app/",
+      "server/",
+      "packages/",
+      "crates/"
+    ],
+    "manifest_filenames": [
+      "pyproject.toml",
+      "requirements.txt",
+      "package.json",
+      "pnpm-workspace.yaml",
+      "go.mod",
+      "Cargo.toml",
+      "Gemfile",
+      "pom.xml",
+      "build.gradle",
+      "Dockerfile",
+      "docker-compose.yml"
+    ],
+    "framework_keywords": {
+      "FastAPI": [
+        "fastapi"
+      ],
+      "Django": [
+        "django"
+      ],
+      "Flask": [
+        "flask"
+      ],
+      "PyTorch": [
+        "pytorch",
+        "torch"
+      ],
+      "Transformers": [
+        "transformers",
+        "huggingface"
+      ],
+      "LangChain": [
+        "langchain"
+      ],
+      "LlamaIndex": [
+        "llamaindex",
+        "llama-index"
+      ],
+      "vLLM": [
+        "vllm"
+      ],
+      "llama.cpp": [
+        "llama.cpp"
+      ],
+      "MLX": [
+        "mlx"
+      ],
+      "ONNX Runtime": [
+        "onnxruntime",
+        "onnx runtime"
+      ],
+      "TensorFlow": [
+        "tensorflow"
+      ],
+      "JAX": [
+        "jax"
+      ],
+      "React": [
+        "react"
+      ],
+      "Next.js": [
+        "next.js",
+        "nextjs"
+      ]
+    },
+    "route_keywords": {
+      "Agent 编排": [
+        "agent loop",
+        "multi-agent",
+        "orchestration",
+        "tool calling",
+        "function calling"
+      ],
+      "RAG/知识检索": [
+        "retrieval augmented",
+        "vector database",
+        "embedding",
+        "knowledge base"
+      ],
+      "本地推理": [
+        "local inference",
+        "on-device",
+        "gguf",
+        "llama.cpp",
+        "mlx"
+      ],
+      "模型服务": [
+        "model serving",
+        "inference server",
+        "openai-compatible"
+      ],
+      "训练/微调": [
+        "fine-tuning",
+        "finetuning",
+        "lora",
+        "qlora"
+      ],
+      "长期记忆": [
+        "long-term memory",
+        "persistent memory",
+        "memory store"
+      ],
+      "工作流自动化": [
+        "workflow automation",
+        "mcp server",
+        "agent skill"
+      ],
+      "多模态": [
+        "multimodal",
+        "vision-language",
+        "image generation",
+        "speech"
+      ]
+    }
+  },
+  "relevance_keywords": [
+    "ai",
+    "agent",
+    "agentic",
+    "llm",
+    "language model",
+    "machine learning",
+    "deep learning",
+    "neural",
+    "rag",
+    "retrieval",
+    "embedding",
+    "vector",
+    "transformer",
+    "inference",
+    "model",
+    "mcp",
+    "skill",
+    "prompt",
+    "computer vision",
+    "generative",
+    "diffusion"
+  ],
+  "relevance_aliases": {
+    "coding_agents": [
+      "claude code",
+      "codex",
+      "opencode"
+    ]
+  },
+  "relevance_exclude_keywords": [
+    "awesome list",
+    "curated list",
+    "interview questions"
+  ],
+  "ranking": {
+    "today_star_weight": 1.0,
+    "snapshot_delta_weight": 0.8,
+    "trending_bonus": 80,
+    "new_source_bonus": 120,
+    "new_repo_age_days": 30,
+    "new_repo_bonus": 100,
+    "max_candidates": 30
+  },
+  "categories": [
+    {
+      "id": "agents",
+      "label": "🤖 AI 智能体/工作流",
+      "semantic_scope": "项目的核心产物是 AI 智能体运行时、harness、skills/技能集、技能目录、子代理编排或面向智能体的工作流框架；不是仅仅在应用内部调用了一个 Agent。若项目交付的是给 Agent 加能力的技能集，即使技能服务营销、SEO 等垂直领域，也优先归入本类。",
+      "semantic_exclusions": [
+        "普通 AI 应用、营销工具、浏览器或桌面客户端，即使它们内部使用 Agent。"
+      ],
+      "keywords": [
+        "agent",
+        "agentic",
+        "workflow",
+        "multi-agent",
+        "mcp",
+        "skill",
+        "automation"
+      ],
+      "strong_keywords": [
+        "agent harness",
+        "meta-harness",
+        "superagent harness",
+        "multi-agent",
+        "agentic workflow",
+        "agent orchestration",
+        "agent skills",
+        "agent skill",
+        "skills catalog",
+        "subagents",
+        "coding agent",
+        "swarm"
+      ]
+    },
+    {
+      "id": "rag",
+      "label": "🔍 RAG/知识库",
+      "semantic_scope": "项目的核心能力是检索增强生成、向量检索、知识库、Embedding 或长期记忆存储，而不是泛化的 Agent 记忆功能。",
+      "semantic_exclusions": [
+        "只把 memory 作为智能体附属能力、但核心产品是工作流或应用的项目。"
+      ],
+      "keywords": [
+        "rag",
+        "retrieval",
+        "vector",
+        "embedding",
+        "knowledge",
+        "memory"
+      ],
+      "strong_keywords": [
+        "rag",
+        "retrieval",
+        "retrieval augmented",
+        "vector database",
+        "knowledge base",
+        "embedding",
+        "long-term memory",
+        "persistent memory",
+        "memory store"
+      ]
+    },
+    {
+      "id": "models",
+      "label": "🧠 大模型/训练",
+      "semantic_scope": "项目的核心能力是模型本身、模型训练/微调、推理算法、扩散模型或模型评测，而不是使用模型构建应用。",
+      "semantic_exclusions": [
+        "以调用现成模型为主的应用、Agent、RAG 或基础设施项目。"
+      ],
+      "keywords": [
+        "model",
+        "llm",
+        "transformer",
+        "training",
+        "fine-tun",
+        "diffusion",
+        "neural"
+      ],
+      "strong_keywords": [
+        "large language model",
+        "language model",
+        "llm",
+        "model training",
+        "fine-tuning",
+        "finetuning",
+        "diffusion",
+        "neural"
+      ]
+    },
+    {
+      "id": "applications",
+      "label": "📦 AI 应用",
+      "semantic_scope": "项目面向终端用户解决具体业务或创作任务，例如营销、交易、视频、图像、语音、搜索、编辑器或桌面工作台；核心价值是可直接使用的完整产品能力。技能集、SDK、框架或供其他 Agent 集成的组件，即使服务某个垂直领域，也不归入本类。",
+      "semantic_exclusions": [
+        "通用 Agent 编排框架、模型训练系统、RAG 基础设施或底层 SDK/运行时。"
+      ],
+      "keywords": [
+        "assistant",
+        "chat",
+        "finance",
+        "video",
+        "image",
+        "search",
+        "browser",
+        "coding"
+      ],
+      "strong_keywords": [
+        "finance",
+        "trading",
+        "video",
+        "image",
+        "assistant",
+        "chat",
+        "marketing",
+        "seo",
+        "3d editor",
+        "architectural projects",
+        "voice",
+        "speech"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "label": "🔧 AI 基础工具",
+      "semantic_scope": "项目的核心产物是供其他 AI 系统集成的底层工具、SDK、协议服务、推理/部署运行时、浏览器自动化、渲染框架或渲染库；即使最终服务视频、浏览器或 Agent 场景，也按底层交付物归入本类。",
+      "semantic_exclusions": [
+        "面向终端用户的完整应用，即使它暴露了 SDK、CLI 或浏览器能力。"
+      ],
+      "keywords": [
+        "framework",
+        "sdk",
+        "inference",
+        "serving",
+        "runtime",
+        "cli",
+        "gateway",
+        "tool"
+      ],
+      "strong_keywords": [
+        "inference server",
+        "model serving",
+        "openai-compatible",
+        "headless browser",
+        "browser automation",
+        "rendering framework",
+        "context window",
+        "mcp server",
+        "software development kit"
+      ]
+    }
+  ],
+  "output": {
+    "top_hot": 10,
+    "top_new": 2,
+    "top_fresh_hot": 3,
+    "fresh_hot_days": 7,
+    "new_project_history_days": 30,
+    "category_limit": 5
+  }
+}

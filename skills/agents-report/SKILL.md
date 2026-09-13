@@ -21,9 +21,11 @@ python3 -m glance_brief check --config config/brief.example.json
 python3 -m glance_brief probe --config config/brief.example.json --report agents-report
 ```
 
-Hermes 安装后使用 `glance-brief/agents-report.py`。该入口完成来源读取、一次模型调用、严格解析、resolver、确定性渲染和 artifacts；Cron 使用 `no_agent: true`，不再附加外层 Prompt。`no_agent` 只关闭外层 Agent，不表示无模型调用。
-
-独立 Preview 也可以使用 `prepare → Cron Agent 写 semantic JSON → render-prepared` handoff；它只验证外层 Agent 模式，不授权修改正式任务。两种模式都必须保持一次来源快照、单轮语义模型、严格 resolver 和确定性 renderer。
+两条运行线有意并存。schema 2 legacy 安装后使用
+`glance-brief/agents-report.py`；当前 V2 production 安装后使用历史兼容路径
+`glance-brief-v2/agents-v2.py`，完成一次来源快照、外层 Agent semantic
+handoff、严格 resolver、确定性渲染和 artifacts。V2 的 `hermes-preview` 只是
+安装器兼容名，不表示当前 writer 仍是 Preview。
 
 `agents_radar_prefetch.py`、`agents-radar-daily.py`、`codexradar_efficiency.py` 等是 producer/utility，不是最终报告入口，也不发送报告。
 
@@ -31,7 +33,7 @@ Hermes 安装后使用 `glance-brief/agents-report.py`。该入口完成来源�
 
 - AI HOT：AI 生态动态；
 - CodexRadar：producer-owned 模型效率 Markdown；
-- agents-radar / 本地开源雷达：hot、fresh、分类与项目事实。
+- agents-radar / 本地开源雷达：hot、fresh、分类与项目事实；独立 producer 源码位于 `producers/local-open-source-radar/`，不由根安装器默认安装或调度。
 
 真实路径与用户配置由 runtime adapter 提供，不写入 Skill。
 

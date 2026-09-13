@@ -2,7 +2,8 @@
 
 ## 0.3.0 — 2026-08-31
 
-- 仓库、Skill 与公开文档统一为 glance_brief v0.3.0；共享 pipeline 晋升为顶层正式 `glance_brief` 包与统一 CLI，不保留实验目录或双发布线。
+- 仓库、Skill 与公开文档统一为 glance_brief v0.3.0；保留顶层 schema 2 legacy 线，并将当前 V2 production runtime 作为独立、可重建的 `runtime/preview/` source tree 管理；`preview` 仅是历史兼容命名。
+- 纳入独立 `local-open-source-radar` producer 的源码、配置和测试；根安装器不自动安装或调度该 producer，Agents 通过显式 publication 边界消费其结构化结果。
 - 引入 bounded adapters、immutable candidate registry、lean semantic payload、resolver、strict validator 与 deterministic renderer；模型只负责候选选择、多候选语义摘要、中文对照翻译和总体趋势。
 - 增加 required、minimum candidates、selection limits、unsafe candidate rejection、manifest、SHA-256 replay 与 tamper rejection 门禁。
 - 移除 legacy converter、legacy fixtures、legacy tests 和多协议运行分支；失败时保留诊断与 failed manifest，不生成 `report.md`。
