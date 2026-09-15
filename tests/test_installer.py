@@ -518,6 +518,148 @@ class FormalInstallerTests(unittest.TestCase):
             self.assertFalse(checks["source-prefetch:agents-report"]["ok"])
             self.assertFalse(checks["source-prefetch:noon-news"]["ok"])
 
+    def test_reports_doctor_checks_each_handoff_data_root(self):
+        with TemporaryDirectory() as temp:
+            home = Path(temp)
+            installed = self._run(
+                "install",
+                "--runtime",
+                "hermes-reports",
+                "--components",
+                "agents-report,noon-news",
+                prefix=home,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            config = json.loads((ROOT / "config" / "brief.reports.example.json").read_text(encoding="utf-8"))
+            live_config = home / "data" / "glance-brief-reports" / "config" / "brief-live.json"
+            live_config.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            source_dir = home / "source-commands"
+            source_dir.mkdir()
+            agents_prefetch = source_dir / "agents-prefetch.py"
+            news_prefetch = source_dir / "news-prefetch.py"
+            agents_prefetch.write_text("# fixture\n", encoding="utf-8")
+            news_prefetch.write_text("# fixture\n", encoding="utf-8")
+            publication_dir = home / "publication"
+            publication_dir.mkdir()
+            agents_data = home / "data" / "glance-brief-agents"
+            news_data = home / "data" / "glance-brief-news"
+            for data_root, name in ((agents_data, "agents"), (news_data, "news")):
+                report = data_root / "runs" / "2026-09-15" / name / "report.md"
+                report.parent.mkdir(parents=True)
+                report.write_text("fixture report\n", encoding="utf-8")
+            env = {
+                **os.environ,
+                "GLANCE_BRIEF_AGENTS_PREFETCH": str(agents_prefetch),
+                "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR": str(publication_dir),
+                "GLANCE_BRIEF_AGENTS_DATA": str(agents_data),
+                "GLANCE_BRIEF_NEWS_PREFETCH": str(news_prefetch),
+                "GLANCE_BRIEF_NEWS_DATA": str(news_data),
+            }
+            doctor = subprocess.run(
+                [sys.executable, str(INSTALLER), "doctor", "--runtime", "hermes-reports", "--prefix", str(home)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
+            result = json.loads(doctor.stdout)
+            self.assertEqual(result["components"]["runtime"]["latest-output:agents-report"]["status"], "ok")
+            self.assertEqual(result["components"]["runtime"]["latest-output:noon-news"]["status"], "ok")
+
+    def test_reports_writer_guard_catches_versioned_legacy_basenames(self):
+        with TemporaryDirectory() as temp:
+            home = Path(temp)
+            installed = self._run(
+                "install",
+                "--runtime",
+                "hermes-reports",
+                "--components",
+                "agents-report,noon-news",
+                prefix=home,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            config = json.loads((ROOT / "config" / "brief.reports.example.json").read_text(encoding="utf-8"))
+            live_config = home / "data" / "glance-brief-reports" / "config" / "brief-live.json"
+            live_config.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            source_dir = home / "source-commands"
+            source_dir.mkdir()
+            (source_dir / "agents-prefetch.py").write_text("# fixture\n", encoding="utf-8")
+            (source_dir / "news-prefetch.py").write_text("# fixture\n", encoding="utf-8")
+            publication_dir = home / "publication"
+            publication_dir.mkdir()
+            (home / "cron").mkdir(parents=True)
+            old_version = "v" + str(2)
+            (home / "cron" / "jobs.json").write_text(
+                json.dumps({"jobs": [
+                    {"id": "agents-current", "script": "glance-brief-reports/agents.py", "enabled": True},
+                    {"id": "agents-old", "script": f"glance-brief-reports/agents-{old_version}.py", "enabled": True},
+                    {"id": "news-current", "script": "glance-brief-reports/news.py", "enabled": True},
+                    {"id": "news-old", "script": f"glance-brief-reports/noon-{old_version}.py", "enabled": True},
+                ]}),
+                encoding="utf-8",
+            )
+            env = {
+                **os.environ,
+                "GLANCE_BRIEF_AGENTS_PREFETCH": str(source_dir / "agents-prefetch.py"),
+                "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR": str(publication_dir),
+                "GLANCE_BRIEF_NEWS_PREFETCH": str(source_dir / "news-prefetch.py"),
+            }
+            verified = subprocess.run(
+                [sys.executable, str(INSTALLER), "verify", "--runtime", "hermes-reports", "--prefix", str(home)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(verified.returncode, 1, verified.stdout + verified.stderr)
+            checks = {item["check"]: item for item in json.loads(verified.stdout)["checks"]}
+            self.assertFalse(checks["single-writer"]["ok"])
+
+    def test_news_uses_shared_reports_config_by_default(self):
+        with TemporaryDirectory() as temp:
+            home = Path(temp)
+            data_root = home / "data" / "glance-brief-news"
+            snapshot = data_root / "source-snapshot.json"
+            config = json.loads((ROOT / "config" / "brief.reports.example.json").read_text(encoding="utf-8"))
+            for report in config["reports"].values():
+                report["input"]["path"] = str(snapshot)
+            config_path = home / "data" / "glance-brief-reports" / "config" / "brief-live.json"
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            fixture = ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json"
+            prefetch = home / "news-prefetch.py"
+            prefetch.write_text(
+                "import json, pathlib\n"
+                "payload = json.loads(pathlib.Path(" + repr(str(fixture)) + ").read_text())\n"
+                "payload[\"schema_version\"] = 1\n"
+                "print(json.dumps(payload, ensure_ascii=False))\n",
+                encoding="utf-8",
+            )
+            env = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("GLANCE_BRIEF_")
+            }
+            env.update({
+                "HERMES_HOME": str(home),
+                "GLANCE_BRIEF_NEWS_DATA": str(data_root),
+                "GLANCE_BRIEF_NEWS_PREFETCH": str(prefetch),
+                "PYTHONPYCACHEPREFIX": str(home / "pycache"),
+            })
+            probed = subprocess.run(
+                [sys.executable, str(ROOT / "runtime" / "reports" / "entrypoints" / "news.py"), "--probe"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(probed.returncode, 0, probed.stdout + probed.stderr)
+            self.assertEqual(json.loads(probed.stdout)["report"], "noon-news")
+
     def _git_head(self):
         return subprocess.run(
             ["git", "rev-parse", "HEAD"],

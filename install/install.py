@@ -437,6 +437,23 @@ def reports_required_environment(manifest: dict, components: list[str]) -> list[
     return requirements
 
 
+def reports_data_root(manifest: dict, home: Path, component: str) -> Path:
+    entry = manifest["reports_runtime"]["entrypoints"][component]
+    environment_name = entry["environment"]["data"]
+    value = os.environ.get(environment_name, "").strip()
+    if value:
+        return Path(value).expanduser()
+    return home / entry["data_default"]
+
+
+def _is_versioned_writer_name(name: str, base_stems: set[str]) -> bool:
+    stem = Path(name).stem
+    return any(
+        stem.startswith(f"{base}-v") and stem[len(base) + 2 :].isdigit()
+        for base in base_stems
+    )
+
+
 def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict) -> list[dict]:
     if not is_reports_runtime(runtime_spec):
         return []
@@ -444,8 +461,12 @@ def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict
     conflicts = []
     for component, component_spec in manifest["components"].items():
         writer_names = {component_spec["entrypoint"]}
+        base_stems = {Path(name).stem for name in writer_names}
         if component in reports:
-            writer_names.add(reports[component]["cron_entrypoint"])
+            current_name = reports[component]["cron_entrypoint"]
+            writer_names.add(current_name)
+            base_stems.add(Path(current_name).stem)
+            base_stems.add(component.split("-", 1)[0])
         active = [
             {
                 "id": job.get("id"),
@@ -455,7 +476,10 @@ def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict
             }
             for job in jobs
             if job.get("enabled", True) is not False
-            and Path(job.get("script") or "").name in writer_names
+            and (
+                Path(job.get("script") or "").name in writer_names
+                or _is_versioned_writer_name(Path(job.get("script") or "").name, base_stems)
+            )
         ]
         if len(active) > 1:
             conflicts.append({"component": component, "writers": active})
@@ -962,8 +986,12 @@ def cmd_doctor(args) -> int:
     if installed:
         now = datetime.now().astimezone().timestamp()
         for comp in installed.get("components", []):
-            out_dir = data_root / "output" / comp
-            files = sorted(out_dir.glob("*/report.md"), key=lambda p: p.stat().st_mtime) if out_dir.is_dir() else []
+            if is_reports_runtime(rt):
+                out_dir = reports_data_root(manifest, home, comp) / "runs"
+                files = sorted(out_dir.glob("*/*/report.md"), key=lambda p: p.stat().st_mtime) if out_dir.is_dir() else []
+            else:
+                out_dir = data_root / "output" / comp
+                files = sorted(out_dir.glob("*/report.md"), key=lambda p: p.stat().st_mtime) if out_dir.is_dir() else []
             if not files:
                 emit("runtime", f"latest-output:{comp}", "warn", f"no verified report under {out_dir}")
                 continue

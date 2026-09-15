@@ -32,7 +32,10 @@ DATA_ROOT = Path(
 PREFETCH_VALUE = os.environ.get("GLANCE_BRIEF_NEWS_PREFETCH")
 PREFETCH = Path(PREFETCH_VALUE).expanduser() if PREFETCH_VALUE else None
 CONFIG = Path(
-    os.environ.get("GLANCE_BRIEF_NEWS_CONFIG", str(DATA_ROOT / "config" / "brief-live.json"))
+    os.environ.get(
+        "GLANCE_BRIEF_NEWS_CONFIG",
+        str(HERMES_HOME / "data" / "glance-brief-reports" / "config" / "brief-live.json"),
+    )
 ).expanduser()
 SNAPSHOT = DATA_ROOT / "source-snapshot.json"
 TZ = ZoneInfo("Asia/Shanghai")

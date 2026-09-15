@@ -88,7 +88,8 @@
         "required_environment": [
           "GLANCE_BRIEF_AGENTS_PREFETCH",
           "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR"
-        ]
+        ],
+        "data_default": "data/glance-brief-agents"
       },
       "noon-news": {
         "source": "runtime/reports/entrypoints/news.py",
@@ -104,7 +105,8 @@
         },
         "required_environment": [
           "GLANCE_BRIEF_NEWS_PREFETCH"
-        ]
+        ],
+        "data_default": "data/glance-brief-news"
       }
     },
     "cron_prompts": {
