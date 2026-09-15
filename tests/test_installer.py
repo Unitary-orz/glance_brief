@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -7,6 +8,7 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from glance_brief import adapters
 
@@ -55,6 +57,41 @@ class FormalInstallerTests(unittest.TestCase):
             {"candidate_id": by_name[name], "description_zh": "用于 AI 工作流的工具。"}
             for name in dict.fromkeys(names)
         ]
+
+    def _installer_module(self):
+        spec = importlib.util.spec_from_file_location("glance_brief_installer", INSTALLER)
+        if spec is None or spec.loader is None:
+            self.fail("could not load installer module")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_reports_data_root_matches_entrypoint_for_empty_data_values(self):
+        installer = self._installer_module()
+        manifest = json.loads((ROOT / "install" / "install-manifest.json").read_text(encoding="utf-8"))
+        home = Path("/tmp/fixture-hermes-home")
+        for component in ("agents-report", "noon-news"):
+            environment_name = manifest["reports_runtime"]["entrypoints"][component]["environment"]["data"]
+            for value in ("", "   "):
+                with self.subTest(component=component, value=repr(value)), patch.dict(
+                    os.environ, {environment_name: value}, clear=False
+                ):
+                    self.assertEqual(
+                        installer.reports_data_root(manifest, home, component),
+                        Path(value).expanduser(),
+                    )
+
+    def test_reports_writer_guard_ignores_unrelated_versioned_names(self):
+        installer = self._installer_module()
+        manifest = json.loads((ROOT / "install" / "install-manifest.json").read_text(encoding="utf-8"))
+        runtime_spec = manifest["runtime_adapters"]["hermes-reports"]
+        for unrelated in ("news-v2.sh", "news-v2", "news-v2.py", "newsletter-v2.py"):
+            with self.subTest(unrelated=unrelated):
+                jobs = [
+                    {"id": "news-current", "script": "glance-brief-reports/news.py", "enabled": True},
+                    {"id": "unrelated", "script": f"other-runtime/{unrelated}", "enabled": True},
+                ]
+                self.assertEqual(installer.single_writer_conflicts(manifest, jobs, runtime_spec), [])
 
     def test_verify_requires_runtime_config_before_job_is_runnable(self):
         with TemporaryDirectory() as temp:
@@ -400,6 +437,9 @@ class FormalInstallerTests(unittest.TestCase):
                 "entrypoints/news.py",
                 "agents.py",
                 "news.py",
+                "lib/glance_brief/input_adapters/__init__.py",
+                "lib/glance_brief/source_adapters/__init__.py",
+                "lib/glance_brief/source_adapters/local_open_source_radar.py",
                 "lib/glance_brief/source_inputs.py",
                 "lib/glance_brief/profiles.py",
                 "lib/glance_brief/prompts/agents-report.md",
@@ -427,6 +467,8 @@ class FormalInstallerTests(unittest.TestCase):
             owned = {item["path"] for item in manifest["owned_files"]}
             self.assertIn("entrypoints/agents.py", owned)
             self.assertIn("agents.py", owned)
+            self.assertIn("lib/glance_brief/input_adapters/__init__.py", owned)
+            self.assertIn("lib/glance_brief/source_adapters/local_open_source_radar.py", owned)
             self.assertIn("lib/glance_brief/source_inputs.py", owned)
 
             (home / "cron").mkdir(parents=True)

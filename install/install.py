@@ -440,14 +440,23 @@ def reports_required_environment(manifest: dict, components: list[str]) -> list[
 def reports_data_root(manifest: dict, home: Path, component: str) -> Path:
     entry = manifest["reports_runtime"]["entrypoints"][component]
     environment_name = entry["environment"]["data"]
-    value = os.environ.get(environment_name, "").strip()
-    if value:
+    value = os.environ.get(environment_name)
+    if value is not None:
         return Path(value).expanduser()
     return home / entry["data_default"]
 
 
-def _is_versioned_writer_name(name: str, base_stems: set[str]) -> bool:
-    stem = Path(name).stem
+_VERSIONED_WRITER_STEMS = {
+    "agents-report": frozenset({"agents", "agents-report"}),
+    "noon-news": frozenset({"noon", "noon-news"}),
+}
+
+
+def _is_versioned_writer_name(name: str, base_stems: set[str] | frozenset[str]) -> bool:
+    path = Path(name)
+    if path.suffix != ".py":
+        return False
+    stem = path.stem
     return any(
         stem.startswith(f"{base}-v") and stem[len(base) + 2 :].isdigit()
         for base in base_stems
@@ -461,12 +470,10 @@ def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict
     conflicts = []
     for component, component_spec in manifest["components"].items():
         writer_names = {component_spec["entrypoint"]}
-        base_stems = {Path(name).stem for name in writer_names}
+        versioned_stems = _VERSIONED_WRITER_STEMS.get(component, frozenset())
         if component in reports:
             current_name = reports[component]["cron_entrypoint"]
             writer_names.add(current_name)
-            base_stems.add(Path(current_name).stem)
-            base_stems.add(component.split("-", 1)[0])
         active = [
             {
                 "id": job.get("id"),
@@ -478,7 +485,7 @@ def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict
             if job.get("enabled", True) is not False
             and (
                 Path(job.get("script") or "").name in writer_names
-                or _is_versioned_writer_name(Path(job.get("script") or "").name, base_stems)
+                or _is_versioned_writer_name(Path(job.get("script") or "").name, versioned_stems)
             )
         ]
         if len(active) > 1:

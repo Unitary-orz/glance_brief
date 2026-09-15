@@ -6,6 +6,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REPORTS_ROOT = REPO_ROOT / "runtime" / "reports"
@@ -13,7 +14,7 @@ CONFIG_PATH = REPO_ROOT / "config" / "brief.reports.example.json"
 
 sys.path.insert(0, str(REPORTS_ROOT / "lib"))
 
-from glance_brief import adapters, contracts, render_report, resolve, source_inputs  # noqa: E402
+from glance_brief import adapters, contracts, input_adapters, render_report, resolve, source_adapters, source_inputs  # noqa: E402
 
 
 class ReportsInputAdapterTests(unittest.TestCase):
@@ -131,6 +132,71 @@ class ReportsInputAdapterTests(unittest.TestCase):
         self.assertIn("aihot", assembled["source_errors"])
         with self.assertRaises(contracts.ContractError):
             adapters.validate_assembly_health(config, contracts.NOON_REPORT, assembled)
+
+
+class ReportsSourceBoundaryTests(unittest.TestCase):
+    def test_input_adapters_package_is_the_implementation_boundary(self) -> None:
+        self.assertIs(source_inputs.load_source_input, input_adapters.load_source_input)
+        self.assertIs(source_inputs.SOURCE_INPUT_ADAPTERS, input_adapters.SOURCE_INPUT_ADAPTERS)
+
+    def test_source_adapter_registry_owns_special_local_radar_logic(self) -> None:
+        adapter = source_adapters.get_source_adapter("open_source_radar")
+        self.assertIs(adapter, source_adapters.local_open_source_radar)
+        self.assertTrue(callable(adapter.adapt_payload))
+        self.assertIsNone(source_adapters.get_source_adapter("aihot"))
+        with self.assertRaises(contracts.ContractError):
+            source_adapters.adapt_payload(
+                "aihot",
+                {},
+                report_date="2026-09-15",
+                report_dir=Path("."),
+            )
+
+    def test_source_adapter_preserves_payload_and_attaches_validated_publication(self) -> None:
+        payload = json.loads(
+            (REPO_ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        payload["local_radar"].pop("publication", None)
+        publication = """📡 **本地开源雷达｜2026-09-15**
+
+**🔥 今日趋势**
+- Agent 工具链持续升温。
+- 本地化与协同编排受关注。
+
+**✨ 本期新入榜**
+- [fixture-labs/agent-workflow](https://github.com/fixture-labs/agent-workflow)「面向 AI 工作流的工具。」(+42★/日)
+
+**🚀 今日热门**
+① **🤖 AI 智能体/工作流**
+- [fixture-labs/agent-workflow](https://github.com/fixture-labs/agent-workflow)「多 agent 协同的源码管控。」(+42★/日)
+② **🧪 评测与基础设施**
+- [fixture-labs/eval-kit](https://github.com/fixture-labs/eval-kit)「用于本地 AI 系统的评测工具。」(+17★/日)
+- [fixture-labs/local-router](https://github.com/fixture-labs/local-router)「用于本地模型路由的工具。」(+9★/日)
+
+**🌱 新项目发现**
+"""
+        with TemporaryDirectory() as temp:
+            report_dir = Path(temp)
+            (report_dir / "2026-09-15.md").write_text(publication, encoding="utf-8")
+            adapted = source_adapters.adapt_payload(
+                "open_source_radar",
+                payload,
+                report_date="2026-09-15",
+                report_dir=report_dir,
+            )
+        self.assertNotIn("publication", payload["local_radar"])
+        self.assertEqual(
+            adapted["local_radar"]["publication"]["trends"],
+            ["Agent 工具链持续升温。", "本地化与协同编排受关注。"],
+        )
+
+    def test_agents_entrypoint_uses_source_adapter_registry(self) -> None:
+        text = (REPORTS_ROOT / "entrypoints" / "agents.py").read_text(encoding="utf-8")
+        self.assertIn("from glance_brief import cli, source_adapters", text)
+        self.assertIn("source_adapters.adapt_payload(", text)
+        self.assertNotIn("local_radar_publication", text)
 
 
 class ReportsWrapperBoundaryTests(unittest.TestCase):

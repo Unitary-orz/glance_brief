@@ -93,11 +93,12 @@ The default reports reasoning metadata is `medium`; scheduler/environment values
 the deployment authority.
 
 The `snapshot_json` input driver is the explicit bridge from one report input
-to multiple source views. `report_json` remains a compatibility alias only.
-Source health is evaluated by the configured Report Plan after each source has
-been attempted, so a failed source is recorded and isolated before the required
-component gate decides whether the report may render. The local-radar Markdown
-bridge lives in the source adapter module rather than in the wrapper.
+into multiple source views. Its implementation lives under
+`input_adapters/`; `source_inputs.py` remains only as a compatibility facade.
+`report_json` remains a compatibility alias only. Sources with special payload or
+publication semantics enter the `source_adapters/` registry; generic News sources
+continue through configured `items_path` and field mappings. The local-radar
+Markdown bridge is implemented by `source_adapters/local_open_source_radar.py`.
 
 ## OpenClaw: contract only in v0.3.0
 

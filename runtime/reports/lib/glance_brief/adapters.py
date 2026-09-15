@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from . import contracts, profiles, source_inputs
+from . import contracts, input_adapters, profiles
 
 _LEGACY_REPORT_SECTIONS = {
     contracts.AGENTS_REPORT: contracts._LEGACY_AGENTS_SECTION_IDS,
@@ -583,7 +583,7 @@ def load_source(
     snapshot_payload: Any = None,
 ) -> Any:
     """Load one source through the registered input-driver boundary."""
-    return source_inputs.load_source_input(
+    return input_adapters.load_source_input(
         source_id,
         source,
         config_dir,
@@ -595,7 +595,7 @@ def load_report_input(report_input: Mapping[str, Any], config_dir: Path) -> Any:
     """Load the one immutable input document shared by a schema-v3 report."""
     if report_input.get("driver") != "json_file":
         raise contracts.ContractError("report input driver must be json_file")
-    return source_inputs.load_source_input("report_input", report_input, config_dir)
+    return input_adapters.load_source_input("report_input", report_input, config_dir)
 
 
 def _items(payload: Any, source: Mapping[str, Any]) -> list[Mapping[str, Any]]:

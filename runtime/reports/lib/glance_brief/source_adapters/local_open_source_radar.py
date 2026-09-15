@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from . import contracts
+from .. import contracts
 
 _PROJECT_RE = re.compile(
     r"\[(?P<name>[^\]]+)\]\((?P<url>https://github\.com/[^)\s]+)\)"
@@ -198,7 +198,7 @@ def load_local_radar_publication(
     )
 
 
-def attach_local_radar_publication(
+def adapt_payload(
     payload: Mapping[str, Any],
     *,
     report_date: str,
