@@ -26,8 +26,9 @@ COMBINED_COST_WEIGHT = math.log(2.5) / math.log(1.35)
 DISPLAY_MODELS = {
     "gpt-5.6-sol": "Sol",
     "gpt-5.6-luna": "Luna",
-    "gpt-5.5": "gpt-5.5",
-    "deepseek-v4-flash": "DeepSeek V4",
+    "deepseek-v4.1-flash": "DP V4.1 Flash",
+    "deepseek-v4-pro": "DS V4 Pro",
+    "gpt-6-astra": "Astra",
 }
 
 
@@ -240,6 +241,50 @@ def select_points(points: list[dict[str, Any]], config: dict[str, Any]) -> list[
     return list(selected.values())
 
 
+def display_points(
+    points: list[dict[str, Any]],
+    mandatory_groups: list[list[dict[str, Any]]],
+    balanced_points: list[dict[str, Any]],
+    config: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Keep ranking winners, then fill the rendered-entry quota by balanced score."""
+    display = config.get("display", {})
+    limit = display.get("max_configs")
+    if limit is None:
+        return points
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("CodexRadar display max_configs must be an integer") from exc
+    if limit <= 0:
+        raise ValueError("CodexRadar display max_configs must be positive")
+    if display.get("fill_method", "balanced_score") != "balanced_score":
+        raise ValueError("CodexRadar display fill_method must be balanced_score")
+
+    mandatory_keys = {
+        (point["model"], point["effort"])
+        for group in mandatory_groups
+        for point in group
+    }
+    mandatory = [point for point in points if (point["model"], point["effort"]) in mandatory_keys]
+    mandatory_entries = sum(len(group) for group in mandatory_groups)
+    if mandatory_entries > limit:
+        raise ValueError("CodexRadar display max_configs is below the mandatory ranking entries")
+
+    balanced_scores = {
+        (point["model"], point["effort"]): point["balanced_score"]
+        for point in balanced_points
+    }
+    remaining = [point for point in points if (point["model"], point["effort"]) not in mandatory_keys]
+    remaining.sort(
+        key=lambda point: (
+            -balanced_scores[(point["model"], point["effort"])],
+            config_order(config, point),
+        )
+    )
+    return mandatory + remaining[: limit - mandatory_entries]
+
+
 def config_order(config: dict[str, Any], point: dict[str, Any]) -> tuple[int, int, str, str]:
     model_order = config.get("ranking", {}).get("other_sort", {}).get("model_order", [])
     effort_order = config.get("effort_order", [])
@@ -335,7 +380,9 @@ def rank_value(points: list[dict[str, Any]], ranking: dict[str, Any], config: di
     return scored[:int(ranking.get("value_top_n", 3))]
 
 
-def rank_balanced(points: list[dict[str, Any]], ranking: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
+def balanced_scored_points(
+    points: list[dict[str, Any]], ranking: dict[str, Any], config: dict[str, Any]
+) -> list[dict[str, Any]]:
     weights = ranking.get("balanced_weights", {})
     weight_iq = float(weights.get("iq", 1))
     weight_time = float(weights.get("average_minutes", 1))
@@ -356,7 +403,11 @@ def rank_balanced(points: list[dict[str, Any]], ranking: dict[str, Any], config:
         )
         scored.append(item)
     scored.sort(key=lambda p: (-p["balanced_score"], p["combined_cost"], -p["iq"], config_order(config, p)))
-    return scored[:int(ranking.get("balanced_top_n", 2))]
+    return scored
+
+
+def rank_balanced(points: list[dict[str, Any]], ranking: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
+    return balanced_scored_points(points, ranking, config)[:int(ranking.get("balanced_top_n", 2))]
 
 
 def display_model(model: str) -> str:
@@ -404,22 +455,24 @@ def build_result(points: list[dict[str, Any]], config: dict[str, Any], source: s
     selected = select_points(points, config)
     ranking = config.get("ranking", {})
     intelligence = rank_intelligence(selected, int(ranking.get("intelligence_top_n", 2)), config)
-    balanced = rank_balanced(selected, ranking, config)
+    balanced_all = balanced_scored_points(selected, ranking, config)
+    balanced = balanced_all[:int(ranking.get("balanced_top_n", 2))]
     value = rank_value(selected, ranking, config)
+    visible = display_points(selected, [intelligence, balanced, value], balanced_all, config)
     top_keys = {
         (point["model"], point["effort"])
         for group in (intelligence, balanced, value)
         for point in group
     }
-    other = [point for point in selected if (point["model"], point["effort"]) not in top_keys]
+    other = [point for point in visible if (point["model"], point["effort"]) not in top_keys]
     other.sort(key=lambda point: config_order(config, point))
     result = {
         "ok": True,
         "available": True,
         "source": source,
         "source_updated_at": source_updated_at,
-        "selected_count": len(selected),
-        "selected": [compact_point(point) for point in sorted(selected, key=lambda p: config_order(config, p))],
+        "selected_count": len(visible),
+        "selected": [compact_point(point) for point in sorted(visible, key=lambda p: config_order(config, p))],
         "rankings": {
             "intelligence_top2": [compact_point(point) for point in intelligence],
             "balanced_top2": [compact_point(point) for point in balanced],

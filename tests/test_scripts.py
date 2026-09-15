@@ -235,7 +235,7 @@ class CodexRadarTests(unittest.TestCase):
     def test_rank_value_uses_configured_price_steps(self):
         data = [
             {
-                "model": "deepseek-v4-flash",
+                "model": "deepseek-v4.1-flash",
                 "effort": "max",
                 "iq": 85.3,
                 "price": 0.22,
@@ -273,8 +273,45 @@ class CodexRadarTests(unittest.TestCase):
             [(point["model"], point["effort"]) for point in ranked],
             [
                 ("gpt-5.6-luna", "max"),
-                ("deepseek-v4-flash", "max"),
+                ("deepseek-v4.1-flash", "max"),
                 ("gpt-5.6-luna", "xhigh"),
+            ],
+        )
+
+    def test_two_dollar_value_candidate_is_penalized_below_cheap_alternative(self):
+        data = [
+            {
+                "model": "gpt-6-astra",
+                "effort": "medium",
+                "iq": 106.2,
+                "price": 2.25,
+                "minutes": 9.0,
+                "combined_cost": 1.0,
+            },
+            {
+                "model": "deepseek-v4.1-flash",
+                "effort": "max",
+                "iq": 85.7,
+                "price": 0.22,
+                "minutes": 31.3,
+                "combined_cost": 1.0,
+            },
+        ]
+        ranking = json.loads(
+            (ROOT / "skills/agents-report/config/codexradar_watch.example.json").read_text(
+                encoding="utf-8"
+            )
+        )["ranking"]
+        config = {"ranking": {"other_sort": {"model_order": []}}, "effort_order": []}
+        self.assertEqual(codexradar.value_price_factor(2.25, ranking), 0.78)
+        self.assertEqual(codexradar.value_price_factor(3.00, ranking), 0.78)
+        self.assertEqual(codexradar.value_price_factor(3.01, ranking), 0.75)
+        ranked = codexradar.rank_value(data, ranking, config)
+        self.assertEqual(
+            [(point["model"], point["effort"]) for point in ranked],
+            [
+                ("deepseek-v4.1-flash", "max"),
+                ("gpt-6-astra", "medium"),
             ],
         )
 
