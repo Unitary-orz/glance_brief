@@ -2,6 +2,7 @@
   "schema_version": 3,
   "sources": {
     "rss_summary": {
+      "adapter": "generic",
       "driver": "snapshot_json",
       "items_path": "rss_summary.items",
       "channel_id": "news-summary",
@@ -20,6 +21,7 @@
       }
     },
     "news_aggregator": {
+      "adapter": "generic",
       "driver": "snapshot_json",
       "items_path": "news_aggregator.items",
       "channel_id": "news-aggregator",
@@ -45,6 +47,7 @@
       }
     },
     "aihot": {
+      "adapter": "generic",
       "driver": "snapshot_json",
       "items_path": "aihot.items",
       "channel_id": "aihot",
@@ -72,6 +75,7 @@
       }
     },
     "open_source_radar": {
+      "adapter": "generic",
       "driver": "snapshot_json",
       "items_path": "local_radar.signals.hot_today",
       "channel_id": "github",
@@ -106,6 +110,7 @@
       }
     },
     "codex_radar": {
+      "adapter": "generic",
       "driver": "snapshot_json",
       "items_path": "codexradar.selected",
       "channel_id": "codexradar",

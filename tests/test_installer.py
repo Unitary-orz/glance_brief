@@ -439,6 +439,7 @@ class FormalInstallerTests(unittest.TestCase):
                 "news.py",
                 "lib/glance_brief/input_adapters/__init__.py",
                 "lib/glance_brief/source_adapters/__init__.py",
+                "lib/glance_brief/source_adapters/generic.py",
                 "lib/glance_brief/source_adapters/local_open_source_radar.py",
                 "lib/glance_brief/source_inputs.py",
                 "lib/glance_brief/profiles.py",
@@ -468,6 +469,7 @@ class FormalInstallerTests(unittest.TestCase):
             self.assertIn("entrypoints/agents.py", owned)
             self.assertIn("agents.py", owned)
             self.assertIn("lib/glance_brief/input_adapters/__init__.py", owned)
+            self.assertIn("lib/glance_brief/source_adapters/generic.py", owned)
             self.assertIn("lib/glance_brief/source_adapters/local_open_source_radar.py", owned)
             self.assertIn("lib/glance_brief/source_inputs.py", owned)
 

@@ -15,6 +15,7 @@ CONFIG_PATH = REPO_ROOT / "config" / "brief.reports.example.json"
 sys.path.insert(0, str(REPORTS_ROOT / "lib"))
 
 from glance_brief import adapters, contracts, input_adapters, render_report, resolve, source_adapters, source_inputs  # noqa: E402
+from glance_brief.source_adapters import generic  # noqa: E402
 
 
 class ReportsInputAdapterTests(unittest.TestCase):
@@ -135,6 +136,10 @@ class ReportsInputAdapterTests(unittest.TestCase):
 
 
 class ReportsSourceBoundaryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+
     def test_input_adapters_package_is_the_implementation_boundary(self) -> None:
         self.assertIs(source_inputs.load_source_input, input_adapters.load_source_input)
         self.assertIs(source_inputs.SOURCE_INPUT_ADAPTERS, input_adapters.SOURCE_INPUT_ADAPTERS)
@@ -151,6 +156,62 @@ class ReportsSourceBoundaryTests(unittest.TestCase):
                 report_date="2026-09-15",
                 report_dir=Path("."),
             )
+
+    def test_generic_source_adapter_is_the_implementation_boundary(self) -> None:
+        self.assertIs(adapters.normalize_candidate, generic.normalize_candidate)
+
+        source = {
+            "items_path": "items",
+            "channel_id": "fixture",
+            "channel_label": "Fixture",
+            "exclude": {"kind": ["ignore"]},
+            "map": {
+                "title": "title",
+                "text": "summary",
+                "extra": {"kind": "kind"},
+                "links": [],
+            },
+            "snapshot": {"status": "status"},
+        }
+        result = generic.adapt_source(
+            "fixture",
+            source,
+            {
+                "items": [
+                    {"title": "Keep", "summary": "Evidence", "kind": "keep"},
+                    {"title": "Drop", "summary": "Evidence", "kind": "ignore"},
+                ],
+                "status": {"ok": True},
+            },
+        )
+
+        self.assertEqual([item["title"] for item in result["items"]], ["Keep"])
+        self.assertEqual(result["snapshot"], {"status": {"ok": True}})
+        self.assertEqual(result["diagnostics"], {"excluded": 1, "rejections": []})
+
+    def test_source_adapter_registry_dispatches_by_adapter_id(self) -> None:
+        self.assertIs(source_adapters.get_adapter("generic"), generic)
+        result = source_adapters.adapt_source(
+            "fixture",
+            {"adapter": "generic", "items_path": "items", "map": {"title": "title", "text": "text", "links": []}},
+            {"items": [{"title": "Fixture", "text": "Evidence"}]},
+        )
+        self.assertEqual(result["items"][0]["title"], "Fixture")
+
+        with self.assertRaisesRegex(contracts.ContractError, "unknown source adapter"):
+            source_adapters.adapt_source(
+                "fixture",
+                {"adapter": "missing", "map": {}},
+                {},
+            )
+
+    def test_report_source_adapter_is_optional_and_defaults_to_generic(self) -> None:
+        config = copy.deepcopy(self.config)
+        for source in config["sources"].values():
+            source.pop("adapter", None)
+        adapters.validate_config(config)
+        config["sources"]["aihot"]["adapter"] = "generic"
+        adapters.validate_config(config)
 
     def test_source_adapter_preserves_payload_and_attaches_validated_publication(self) -> None:
         payload = json.loads(

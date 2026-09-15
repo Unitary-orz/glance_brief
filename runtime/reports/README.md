@@ -15,10 +15,11 @@ entrypoints/
   agents.py       Hermes-facing Agents orchestration wrapper
   news.py         Hermes-facing News orchestration wrapper
 lib/glance_brief/
-  adapters.py                 source catalog, normalization, assembly
+  adapters.py                 assembly facade and report/source binding
   input_adapters/             bounded json_file / command_json / snapshot_json drivers
-  source_adapters/            registered source-specific payload/publication adapters
-    local_open_source_radar.py  local-radar publication adapter
+  source_adapters/             source adaptation registry and implementations
+    generic.py                  configured items_path / map / snapshot adapter
+    local_open_source_radar.py  local-radar publication compatibility adapter
   source_inputs.py            compatibility facade for input_adapters
   contracts.py                canonical data and validation contracts
   profiles.py                 schema-3 Report Plan compiler
@@ -34,11 +35,12 @@ tests/                          offline and boundary regression tests
   compatibility, source metadata, and source-specific exceptions.
 - `input_adapters/` only loads a bounded payload; `source_inputs.py` is a
   compatibility facade for that package.
-- `source_adapters/` is the registry for sources with special payload or
-  publication semantics. Generic News sources remain configuration-driven
-  through `items_path` and `map` in the Report Plan.
-- The core consumes the canonical source contract and owns candidate assembly,
-  health gates, ranking, semantic validation, and deterministic rendering.
+- `source_adapters/` is the source adaptation boundary. `generic.py` handles configured
+  `items_path`, `map`, `exclude`, and `snapshot`; special payload or publication
+  semantics can register a sibling adapter. Source IDs and adapter IDs remain
+  separate so multiple sources can share one implementation.
+- The core consumes the adapter result and owns candidate assembly, health gates,
+  ranking, semantic validation, and deterministic rendering.
 - The publication layer only mounts producer-owned output into the canonical
   report input. It does not fetch sources or choose a model.
 - The Hermes wrappers own orchestration and model metadata. They do not define

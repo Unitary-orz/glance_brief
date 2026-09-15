@@ -91,17 +91,18 @@ handoff prompt 和边界测试。默认 schema 2 installer 不会触碰它；显
 manifest 将完整依赖闭包映射到 `scripts/glance-brief-reports/`，记录 source
 revision/owned-file hashes，并仍然不自动修改 Cron 或投递。
 
-reports 的来源输入分为三类：`json_file` 和 `command_json` 负责得到一个独立
-payload，`snapshot_json` 只返回报告已加载的不可变 snapshot。具体实现位于
-`input_adapters/`，`source_inputs.py` 仅为兼容旧 import 的 facade。所有来源都
-经同一个注册表进入 `load_source`，再由映射层规范化；assembler 不再针对
-`report_json` 写来源分支。`report_json` 仅保留为兼容别名，新的配置使用
-`snapshot_json`。
+reports 的来源输入分为两层：`input_adapters/` 中的 `json_file`、
+`command_json` 和 `snapshot_json` 负责得到原始 payload；`source_adapters/` 再按
+`adapter_id` 将 payload 映射为统一的候选、snapshot 和 diagnostics 结果。默认
+`generic` adapter 处理 `items_path`、`map`、`exclude` 和 `snapshot`，只有来源存在
+额外 payload/publication 语义时才注册专用 adapter。`source_id` 表示来源，
+`adapter_id` 表示处理实现，二者不绑定。`source_inputs.py` 仅为兼容旧 import 的
+facade。所有来源都经同一个 input-driver 和 source-adapter 边界进入 assembly；
+assembler 不再直接实现通用字段映射。
 
-具有特殊 payload/publication 语义的来源通过 `source_adapters/` registry 接入；
-当前 `open_source_radar` 使用 `local_open_source_radar.py`。News 的
-`rss_summary`、`news_aggregator` 和 `aihot` 仍走通用 `items_path`/`map` 配置，
-不进入来源特判模块。
+具有特殊 payload/publication 语义的来源可以通过 `source_adapters/` registry 接入；
+当前 `open_source_radar` 的 Markdown publication 仍使用兼容桥。News 的
+`rss_summary`、`news_aggregator` 和 `aihot` 走 `generic` adapter，不进入来源特判模块。
 
 Wrapper 只负责运行 producer、锁、路径和 handoff；required source、最小候选
 数和质量门禁由 Report Plan/core 统一执行。来源专用的 local-radar 发布物
