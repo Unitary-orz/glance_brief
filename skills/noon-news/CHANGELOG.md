@@ -6,7 +6,7 @@
 - 引入单候选语义协议、candidate registry、元数据恢复、selection limits 和 deterministic renderer。
 - 增加 unsafe candidate rejection、required、minimum candidates、manifest、replay 和 tamper rejection 门禁。
 - 英文原题后的中文部分统一称为“中文对照翻译”。
-- 当前 V2 production 使用 `runtime/preview/` source tree；`hermes-preview` 与 `glance-brief-v2` 仅为兼容安装/运行名称。
+- 当前 reports production 使用 `runtime/reports/` source tree，并通过 `hermes-reports` 安装到 `glance-brief-reports`。
 
 ## 0.2.0 — 2026-08-10
 

@@ -101,7 +101,7 @@ class ResolvedSchemaContractTests(unittest.TestCase):
 
     def test_legacy_protocol_and_fourth_section_are_rejected(self):
         for broken in (
-            {**self._noon(), "semantic_protocol": "glance_brief.noon-news.preview"},
+            {**self._noon(), "semantic_protocol": "glance_brief.noon-news.invalid"},
             {
                 **self._noon(),
                 "sections": {

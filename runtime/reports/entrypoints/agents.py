@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated Agents V2 Preview: prepare semantic evidence, then render deterministically.
+"""Agents report: prepare semantic evidence, then render deterministically.
 
 The default invocation is the Hermes Cron pre-run stage. It captures the current
 formal producer snapshot once, asks the Cron-owned model only for semantic JSON,
@@ -23,29 +23,28 @@ from zoneinfo import ZoneInfo
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser()
 RUNTIME_ROOT = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_ROOT", str(Path(__file__).resolve().parents[1]))
+    os.environ.get("GLANCE_BRIEF_REPORTS_ROOT", str(Path(__file__).resolve().parents[1]))
 ).expanduser()
 LIB_ROOT = RUNTIME_ROOT / "lib"
 DATA_ROOT = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_DATA", str(HERMES_HOME / "data" / "glance-brief-agents-v2"))
+    os.environ.get("GLANCE_BRIEF_AGENTS_DATA", str(HERMES_HOME / "data" / "glance-brief-agents"))
 ).expanduser()
-PREFETCH = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_PREFETCH", str(HERMES_HOME / "scripts" / "glance-brief" / "agents-report.py"))
-).expanduser()
+PREFETCH_VALUE = os.environ.get("GLANCE_BRIEF_AGENTS_PREFETCH")
+PREFETCH = Path(PREFETCH_VALUE).expanduser() if PREFETCH_VALUE else None
 CONFIG = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_CONFIG", str(HERMES_HOME / "data" / "glance-brief-v2" / "config" / "brief-live.json"))
+    os.environ.get("GLANCE_BRIEF_AGENTS_CONFIG", str(HERMES_HOME / "data" / "glance-brief-reports" / "config" / "brief-live.json"))
 ).expanduser()
 SNAPSHOT = DATA_ROOT / "source-snapshot.json"
 TZ = ZoneInfo("Asia/Shanghai")
 REPORT = "agents-report"
-MODEL = os.environ.get("GLANCE_BRIEF_PREVIEW_MODEL", "MiniMax-M3")
-PROVIDER = os.environ.get("GLANCE_BRIEF_PREVIEW_PROVIDER", "minimax-cn")
-REASONING = os.environ.get("GLANCE_BRIEF_PREVIEW_REASONING", "medium")
+MODEL = os.environ.get("GLANCE_BRIEF_AGENTS_MODEL", "MiniMax-M3")
+PROVIDER = os.environ.get("GLANCE_BRIEF_AGENTS_PROVIDER", "minimax-cn")
+REASONING = os.environ.get("GLANCE_BRIEF_AGENTS_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
 from glance_brief import cli, local_radar_publication  # noqa: E402
 
-PUBLICATION_DIR_VALUE = os.environ.get("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR")
+PUBLICATION_DIR_VALUE = os.environ.get("GLANCE_BRIEF_AGENTS_PUBLICATION_DIR")
 PUBLICATION_DIR = Path(PUBLICATION_DIR_VALUE).expanduser() if PUBLICATION_DIR_VALUE else None
 
 
@@ -81,9 +80,13 @@ def _atomic_json(path: Path, value: object) -> None:
 
 
 def _prefetch(report_date: str) -> dict:
+    if PREFETCH is None:
+        raise RuntimeError(
+            "GLANCE_BRIEF_AGENTS_PREFETCH must point to the dedicated agents source command"
+        )
     if PUBLICATION_DIR is None:
         raise RuntimeError(
-            "GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR must point to the dated local-radar publication root"
+            "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR must point to the dated local-radar publication root"
         )
     result = _run([sys.executable, str(PREFETCH)], timeout=300)
     if result.returncode != 0:
@@ -149,7 +152,7 @@ def _prepare() -> dict:
 
 def _print_agent_handoff(prepared_result: dict) -> None:
     prepared = prepared_result["prepared"]
-    print("GLANCE_BRIEF_AGENTS_V2_SEMANTIC_HANDOFF")
+    print("GLANCE_BRIEF_AGENTS_SEMANTIC_HANDOFF")
     print(f"RUN_DIR={prepared['run_dir']}")
     print(f"SEMANTIC_OUTPUT={prepared['semantic_output']}")
     print(f"RENDER_COMMAND={prepared['render_command']}")
@@ -162,7 +165,7 @@ def _validated_run_dir(value: str) -> Path:
     run_dir = Path(value).expanduser().resolve()
     runs_root = (DATA_ROOT / "runs").resolve()
     if run_dir == runs_root or runs_root not in run_dir.parents:
-        raise RuntimeError("render run directory is outside the isolated Agents V2 runs root")
+        raise RuntimeError("render run directory is outside the isolated Agents reports runs root")
     if not run_dir.is_dir():
         raise RuntimeError(f"render run directory does not exist: {run_dir}")
     return run_dir
@@ -185,7 +188,7 @@ def _render_run(value: str) -> str:
     if prepared.get("semantic_output") != str(semantic_path):
         raise RuntimeError("prepared semantic output path does not match requested run")
     if prepared.get("config_sha256") != _sha256(CONFIG):
-        raise RuntimeError("Agents V2 config changed after semantic preparation")
+        raise RuntimeError("Agents reports config changed after semantic preparation")
     render_args = argparse.Namespace(
         config=CONFIG,
         output_dir=run_dir,
@@ -196,9 +199,9 @@ def _render_run(value: str) -> str:
     manifest["source_snapshot_sha256"] = prepared.get("source_snapshot_sha256")
     cli.write_json(run_dir / "manifest.json", manifest)
     if manifest.get("status") != "ok" or manifest.get("report") != REPORT:
-        raise RuntimeError("Agents V2 manifest does not describe a successful run")
+        raise RuntimeError("Agents reports manifest does not describe a successful run")
     if not report_path.is_file():
-        raise RuntimeError("Agents V2 renderer succeeded without report.md")
+        raise RuntimeError("Agents reports renderer succeeded without report.md")
     return report_path.read_text(encoding="utf-8").rstrip()
 
 
@@ -222,7 +225,7 @@ def _probe(prepared_result: dict) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", action="store_true", help="fetch and validate real Agents candidates without a model call")
-    parser.add_argument("--render-run", help="validate semantic JSON and render one prepared Agents V2 run")
+    parser.add_argument("--render-run", help="validate semantic JSON and render one prepared Agents reports run")
     args = parser.parse_args()
 
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
@@ -231,7 +234,7 @@ def main() -> int:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise RuntimeError("another Agents V2 stage is already active") from exc
+            raise RuntimeError("another Agents reports stage is already active") from exc
         if args.render_run:
             print(_render_run(args.render_run))
             return 0
@@ -247,5 +250,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(f"Agents V2 failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"Agents reports failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         raise SystemExit(1)

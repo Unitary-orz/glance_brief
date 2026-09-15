@@ -78,7 +78,7 @@ def parse_local_radar_report(
 
     ``local_report_categories`` is an optional compatibility assertion for the
     old lexical mapping. The standalone radar now publishes semantic
-    categories in Markdown, so the Preview can treat that dated publication as
+    categories in Markdown, so the Reports can treat that dated publication as
     authoritative while still checking exact project coverage and provenance.
     """
     if not isinstance(text, str):

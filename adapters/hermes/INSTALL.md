@@ -49,35 +49,36 @@ Each report entry point is a complete batch application:
 The shared `glance_brief` package does not import Hermes or select a provider.
 Hermes-specific model invocation exists only in the installed runtime entry point.
 
-The current V2 production agent-handoff mode maps the source-owned tree through
-`python3 install/install.py install --runtime hermes-preview` to:
+The current reports production agent-handoff mode maps the source-owned tree through
+`python3 install/install.py install --runtime hermes-reports` to:
 
 ```text
-$HERMES_HOME/scripts/glance-brief-v2/
-├── agents-v2.py                 # flat scheduler wrapper
-├── noon-v2.py                   # flat scheduler wrapper
+$HERMES_HOME/scripts/glance-brief-reports/
+├── agents.py                 # flat scheduler wrapper
+├── news.py                   # flat scheduler wrapper
 ├── entrypoints/                 # source entrypoints retained for auditability
-├── lib/glance_brief/            # complete V2 core and Prompt closure
+├── lib/glance_brief/            # complete reports core and Prompt closure
 └── cron-prompts/                # sanitized outer-Agent handoff prompts
 
-$HERMES_HOME/data/glance-brief-v2/config/
-├── brief.preview.example.json   # installed example; fixture-backed
+$HERMES_HOME/data/glance-brief-reports/config/
+├── brief.reports.example.json   # installed example; fixture-backed
 └── brief-live.json              # user-authored schema 3 config
 ```
 
-The flat wrappers set `HERMES_HOME` and `GLANCE_BRIEF_PREVIEW_ROOT` from their
+The flat wrappers set `HERMES_HOME` and `GLANCE_BRIEF_REPORTS_ROOT` from their
 installed location, so the mapping is relocatable under a different Hermes
 home. The installer records the repository `source_revision`, dirty-state
 marker, and hashes for every owned file. It does not create, disable, or update
 Cron jobs.
 
-V2 jobs are outer-Agent handoff jobs (`no_agent: false`) and must use the
-prompt printed by the installer or `adapters/hermes/jobs.preview.example.json`.
-The Agents job must set `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR` explicitly to the
-already-published local-radar directory; the wrapper fails closed when it is
-missing instead of silently using a guessed directory. The `hermes-preview` name
-is historical; do not enable the V2 writer and the corresponding schema 2 legacy
-writer for the same destination together.
+Reports jobs are outer-Agent handoff jobs (`no_agent: false`) and must use the
+prompt printed by the installer or `adapters/hermes/jobs.reports.example.json`.
+The Agents job must set `GLANCE_BRIEF_AGENTS_PREFETCH` and
+`GLANCE_BRIEF_AGENTS_PUBLICATION_DIR`; the News job must set
+`GLANCE_BRIEF_NEWS_PREFETCH`. The wrappers fail closed when these bindings are
+missing instead of silently guessing a source command. Do not enable the reports
+writer and the corresponding schema 2 legacy writer for the same destination
+together.
 
 ## `no_agent` jobs
 
@@ -135,7 +136,7 @@ NEWS_AGGREGATOR_SCRIPT
 NEWS_SUMMARY_SCRIPT
 ```
 
-The V2 Agents path consumes the explicitly configured publication directory
+The reports Agents path consumes the explicitly configured publication directory
 instead of guessing a reader path. External news skills are installed
 separately. The installer reports missing ones as warnings and does not fetch
 them automatically.

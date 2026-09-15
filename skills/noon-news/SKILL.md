@@ -22,10 +22,9 @@ python3 -m glance_brief probe --config config/brief.example.json --report noon-n
 ```
 
 两条运行线有意并存。schema 2 legacy 安装后使用
-`glance-brief/noon-news.py`；当前 V2 production 安装后使用历史兼容路径
-`glance-brief-v2/noon-v2.py`，完成一次来源快照、外层 Agent semantic handoff、
-严格 resolver、确定性渲染和 artifacts。V2 的 `hermes-preview` 只是安装器
-兼容名，不表示当前 writer 仍是 Preview。
+`glance-brief/noon-news.py`；当前 reports production 安装后使用
+`glance-brief-reports/news.py`，完成一次来源快照、外层 Agent semantic handoff、
+严格 resolver、确定性渲染和 artifacts。
 
 `noon_news_prefetch.py` 是可选 producer，不是最终报告入口，也不发送报告。
 

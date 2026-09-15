@@ -22,10 +22,9 @@ python3 -m glance_brief probe --config config/brief.example.json --report agents
 ```
 
 两条运行线有意并存。schema 2 legacy 安装后使用
-`glance-brief/agents-report.py`；当前 V2 production 安装后使用历史兼容路径
-`glance-brief-v2/agents-v2.py`，完成一次来源快照、外层 Agent semantic
-handoff、严格 resolver、确定性渲染和 artifacts。V2 的 `hermes-preview` 只是
-安装器兼容名，不表示当前 writer 仍是 Preview。
+`glance-brief/agents-report.py`；当前 reports production 安装后使用
+`glance-brief-reports/agents.py`，完成一次来源快照、外层 Agent semantic
+handoff、严格 resolver、确定性渲染和 artifacts。
 
 `agents_radar_prefetch.py`、`agents-radar-daily.py`、`codexradar_efficiency.py` 等是 producer/utility，不是最终报告入口，也不发送报告。
 

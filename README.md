@@ -45,15 +45,15 @@ producer JSON
 
 配置只允许受控 `json_file` 和 argv 形式的 `command_json` 来源；必选来源、板块候选下限、最终选择上下限和数据质量均由程序 hard gate。失败时保留诊断和 manifest，不生成可投递报告。
 
-### 当前 V2 生产 runtime 的源码边界
+### 当前 reports 生产 runtime 的源码边界
 
-当前正式生产 writer 使用这份 V2 source tree；`runtime/preview/` 是历史兼容目录名，
-不表示当前只用于预览。可重建源码统一收在 [`runtime/preview/`](runtime/preview/)，
-该目录包含两个入口、V2 core、Prompt、schema-v3 配置样例、离线 snapshot
+当前正式生产 writer 使用这份 reports source tree；`runtime/reports/` 是历史兼容目录名，
+不表示当前只用于预览。可重建源码统一收在 [`runtime/reports/`](runtime/reports/)，
+该目录包含两个入口、reports core、Prompt、schema-v3 配置样例、离线 snapshot
 和解耦回归测试。`--runtime hermes` 保留为 schema 2 legacy 批处理 runtime；
-当前 V2 的安装映射仍使用历史兼容名 `--runtime hermes-preview`，将源码映射到
-`glance-brief-v2`。该模式只安装文件、记录 source revision/owned-file hashes
-并输出 Cron 建议，不自动修改 Cron、投递或 live runtime。V2 通过注册式
+当前 reports 的安装映射仍使用历史兼容名 `--runtime hermes-reports`，将源码映射到
+`glance-brief-reports`。该模式只安装文件、记录 source revision/owned-file hashes
+并输出 Cron 建议，不自动修改 Cron、投递或 live runtime。reports 通过注册式
 `snapshot_json` input adapter 让多个来源查看同一份不可变输入；`report_json` 只作兼容别名。
 
 详见：
@@ -89,7 +89,7 @@ https://github.com/Unitary-orz/glance_brief
 克隆后读取根目录 INSTALL.md；创建定时任务或设置投递目标前先展示预览并确认。
 ```
 
-`install/install.py` 同时提供 schema 2 legacy 批处理映射和当前 V2 agent-handoff 映射；两条运行线有意并存，不再声称共用同一套实现。当前生产 writer 使用 `glance-brief-v2` 下的 V2 core，`hermes-preview` 只是仓库安装器保留的历史兼容名。Hermes V2 Job 使用外层 handoff，由 core 校验和渲染；schema 2 Job 才使用 `no_agent: true` 的批处理入口。OpenClaw 在 v0.3.0 仅提供 adapter contract，不发布未验证的可运行 Job 模板。定时任务和投递目标仍须在用户确认后由 runtime 原生接口创建或更新。
+`install/install.py` 同时提供 schema 2 legacy 批处理映射和当前 reports agent-handoff 映射；两条运行线有意并存，不再声称共用同一套实现。当前生产 writer 使用 `glance-brief-reports` 下的 reports core，`hermes-reports` 只是仓库安装器保留的历史兼容名。Hermes reports Job 使用外层 handoff，由 core 校验和渲染；schema 2 Job 才使用 `no_agent: true` 的批处理入口。OpenClaw 在 v0.3.0 仅提供 adapter contract，不发布未验证的可运行 Job 模板。定时任务和投递目标仍须在用户确认后由 runtime 原生接口创建或更新。
 
 ### 本地验证
 
@@ -99,11 +99,11 @@ python3 -B -m unittest tests.test_contracts tests.test_pipeline -v
 python3 -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
-V2 的可重建源码位于 `runtime/preview/`，V2 两份报告共享该目录内的 core；顶层 `glance_brief/` 则保留 schema 2 legacy 业务包。两条运行线通过各自的 manifest、配置与 runtime adapter 隔离。
+reports 的可重建源码位于 `runtime/reports/`，reports 两份报告共享该目录内的 core；顶层 `glance_brief/` 则保留 schema 2 legacy 业务包。两条运行线通过各自的 manifest、配置与 runtime adapter 隔离。
 
 ## 后续工作
 
-- [x] 已完成 V2 Cron 切换、单 writer 校验和回滚演练；具体运行记录与备份位置属于本地 runtime，不入仓库
+- [x] 已完成 reports Cron 切换、单 writer 校验和回滚演练；具体运行记录与备份位置属于本地 runtime，不入仓库
 - [ ] 增加 artifact 原子发布、分层 deadline 和运行告警
 - [ ] 补充 HTTP producer adapter 前先明确安全与缓存边界
 - [ ] 支持更多 runtime adapter

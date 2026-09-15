@@ -84,7 +84,7 @@ SOURCE_INPUT_ADAPTERS: dict[str, SourceInputAdapter] = {
     "json_file": JsonFileInput(),
     "command_json": CommandJsonInput(),
     "snapshot_json": SnapshotJsonInput(),
-    # Compatibility for schema-v3 Preview configs written before the driver
+    # Compatibility for schema-v3 Reports configs written before the driver
     # was renamed.  New configs should use snapshot_json.
     "report_json": SnapshotJsonInput(),
 }

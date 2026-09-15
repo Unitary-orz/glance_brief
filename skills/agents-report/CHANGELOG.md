@@ -7,7 +7,7 @@
 - 模型不再拥有 URL、来源、项目事实、指标、分类、fresh、Codex block 或 Markdown。
 - 增加 required、minimum candidates、quality、GitHub URL、manifest、replay 和 tamper rejection 门禁。
 - 独立 `local-open-source-radar` producer 的 publication 作为开源事实源接入；根安装器不安装或调度该 producer，runtime 通过显式路径消费其结构化结果。
-- 当前 V2 production 使用 `runtime/preview/` source tree；`hermes-preview` 与 `glance-brief-v2` 仅为兼容安装/运行名称。
+- 当前 reports production 使用 `runtime/reports/` source tree，并通过 `hermes-reports` 安装到 `glance-brief-reports`。
 
 ## 0.2.0 — 2026-08-10
 

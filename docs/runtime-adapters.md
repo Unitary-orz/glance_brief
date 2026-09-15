@@ -67,29 +67,29 @@ prepared artifact hashes, then renders from the saved registry without reading
 sources again. A runtime wrapper may add model/provider usage metadata, but the
 shared CLI does not select a Hermes provider.
 
-This mode is the current V2 production agent-handoff runtime in the workspace.
-`Preview`/`hermes-preview` are historical source and installer names retained for
-path compatibility, not a claim that the active V2 writer is still shadow-only.
+This mode is the current reports production agent-handoff runtime in the workspace.
+`runtime/reports/` and `hermes-reports` are the formal source and installer names.
 Installing or updating the repository mapping remains an explicit file operation:
 it does not itself modify Cron jobs, delivery settings, or the active live runtime.
 
-## V2 production source tree and explicit install mapping
+## reports production source tree and explicit install mapping
 
-The current V2 production runtime is source-owned under `runtime/preview/`. Its
-entrypoints, V2 core, Prompt files, schema-v3 example, immutable offline
+The current reports production runtime is source-owned under `runtime/reports/`. Its
+entrypoints, reports core, Prompt files, schema-v3 example, immutable offline
 fixture, Cron handoff prompts, and productization tests are versioned together.
 The default schema 2 legacy installer does not touch this tree. An explicit
-`install/install.py install --runtime hermes-preview` maps it to
-`scripts/glance-brief-v2/`, generates flat `agents-v2.py`/`noon-v2.py` wrappers,
+`install/install.py install --runtime hermes-reports` maps it to
+`scripts/glance-brief-reports/`, generates flat `agents.py`/`news.py` wrappers,
 records source revision and hashes for the complete owned closure, and prints
 Cron suggestions. It never writes `jobs.json` or delivery settings.
 
-The entrypoints use `GLANCE_BRIEF_PREVIEW_*` environment variables for
-deployment-specific paths; no Hermes home, live Cron ID, delivery target,
-credential, or generated snapshot is committed. The Agents runtime requires an
-explicit `GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR` and fails closed if it is absent, so a
-portable default cannot silently point at the wrong local-radar publication.
-The default V2 reasoning metadata is `medium`; scheduler/environment values remain
+The entrypoints use separate `GLANCE_BRIEF_AGENTS_*` and
+`GLANCE_BRIEF_NEWS_*` environment variables for deployment-specific paths; no
+Hermes home, live Cron ID, delivery target, credential, or generated snapshot is
+committed. Both source prefetch commands are explicit; the Agents runtime also
+requires `GLANCE_BRIEF_AGENTS_PUBLICATION_DIR` and fails closed if it is absent,
+so a portable default cannot silently point at the wrong local-radar publication.
+The default reports reasoning metadata is `medium`; scheduler/environment values remain
 the deployment authority.
 
 The `snapshot_json` input driver is the explicit bridge from one report input

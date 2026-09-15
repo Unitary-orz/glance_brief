@@ -98,5 +98,5 @@
 1. 更新 Prompt 所有权边界；
 2. 更新本文档；
 3. 更新 fixture/contract tests；
-4. 生成本地 preview；
+4. 生成本地 reports；
 5. 获得明确授权后才同步 runtime 或 Cron。

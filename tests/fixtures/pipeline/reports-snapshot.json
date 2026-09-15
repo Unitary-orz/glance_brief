@@ -5,7 +5,7 @@
         "title": "International representatives issue joint statement",
         "description": "International representatives issued a joint statement on maritime research cooperation.",
         "source": "Example Wire",
-        "link": "https://example.com/preview/international/joint-statement"
+        "link": "https://example.com/reports/international/joint-statement"
       }
     ]
   },
@@ -13,24 +13,24 @@
     "items": [
       {
         "title": "示例企业发布季度经营说明",
-        "summary": "企业发布季度经营说明，内容仅用于 Preview 的离线合同测试。",
+        "summary": "企业发布季度经营说明，内容仅用于 Reports 的离线合同测试。",
         "source": "Example Business",
         "time": "2026-08-30T02:00:00Z",
-        "url": "https://example.com/preview/business/quarterly-update"
+        "url": "https://example.com/reports/business/quarterly-update"
       },
       {
         "title": "示例科技项目发布公共安全更新",
         "summary": "科技项目发布公共安全更新，说明将改善用户的日常使用流程。",
         "source": "Example Technology",
         "time": "2026-08-30T02:30:00Z",
-        "url": "https://example.com/preview/technology/safety-update"
+        "url": "https://example.com/reports/technology/safety-update"
       },
       {
         "title": "示例项目出现在不应使用的来源",
         "summary": "这条记录验证 source exclude 在 take 之前生效。",
         "source": "GitHub Trending",
         "time": "2026-08-30T02:45:00Z",
-        "url": "https://example.com/preview/excluded"
+        "url": "https://example.com/reports/excluded"
       }
     ]
   },
@@ -43,8 +43,8 @@
         "published_at": "2026-08-30T03:00:00Z",
         "source": "Example AI Lab",
         "links": {
-          "aihot": "https://example.com/preview/ai/item/agent-audit-workflow",
-          "original": "https://example.com/preview/ai/original/agent-audit-workflow"
+          "aihot": "https://example.com/reports/ai/item/agent-audit-workflow",
+          "original": "https://example.com/reports/ai/original/agent-audit-workflow"
         }
       },
       {
@@ -54,8 +54,8 @@
         "published_at": "2026-08-30T03:30:00Z",
         "source": "Example Research",
         "links": {
-          "aihot": "https://example.com/preview/ai/item/tool-use-evaluation",
-          "original": "https://example.com/preview/ai/original/tool-use-evaluation"
+          "aihot": "https://example.com/reports/ai/item/tool-use-evaluation",
+          "original": "https://example.com/reports/ai/original/tool-use-evaluation"
         }
       }
     ]

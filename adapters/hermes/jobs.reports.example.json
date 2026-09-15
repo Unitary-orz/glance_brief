@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "runtime": "hermes-reports",
+  "template": true,
+  "mode": "agent-handoff",
+  "note": "Run install/install.py install --runtime hermes-reports first. Each script is relative to $HERMES_HOME/scripts/. The installer prints the handoff prompt and required environment variables; create jobs through Hermes' native scheduler interface. Do not enable these jobs while the corresponding legacy batch writer is still enabled for the same destination.",
+  "jobs": [
+    {
+      "name": "agents-report",
+      "schedule_utc": "5 2 * * *",
+      "script": "glance-brief-reports/agents.py",
+      "no_agent": false,
+      "prompt_source": "glance-brief-reports/cron-prompts/agents-handoff.md",
+      "required_environment": [
+        "GLANCE_BRIEF_AGENTS_PREFETCH",
+        "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR"
+      ],
+      "environment": {
+        "data": "GLANCE_BRIEF_AGENTS_DATA",
+        "config": "GLANCE_BRIEF_AGENTS_CONFIG",
+        "prefetch": "GLANCE_BRIEF_AGENTS_PREFETCH",
+        "model": "GLANCE_BRIEF_AGENTS_MODEL",
+        "provider": "GLANCE_BRIEF_AGENTS_PROVIDER",
+        "reasoning": "GLANCE_BRIEF_AGENTS_REASONING",
+        "publication_dir": "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR"
+      },
+      "deliver": "<platform>:<chat_id>"
+    },
+    {
+      "name": "noon-news",
+      "schedule_utc": "35 4 * * *",
+      "script": "glance-brief-reports/news.py",
+      "no_agent": false,
+      "prompt_source": "glance-brief-reports/cron-prompts/noon-handoff.md",
+      "required_environment": [
+        "GLANCE_BRIEF_NEWS_PREFETCH"
+      ],
+      "environment": {
+        "data": "GLANCE_BRIEF_NEWS_DATA",
+        "config": "GLANCE_BRIEF_NEWS_CONFIG",
+        "prefetch": "GLANCE_BRIEF_NEWS_PREFETCH",
+        "model": "GLANCE_BRIEF_NEWS_MODEL",
+        "provider": "GLANCE_BRIEF_NEWS_PROVIDER",
+        "reasoning": "GLANCE_BRIEF_NEWS_REASONING"
+      },
+      "deliver": "<platform>:<chat_id>"
+    }
+  ]
+}

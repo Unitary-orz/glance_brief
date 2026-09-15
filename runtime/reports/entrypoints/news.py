@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Single-Cron V2 Noon wrapper: prepare evidence, then deterministically render.
+"""News report: prepare evidence, then deterministically render.
 
 Default mode is the Hermes Cron pre-run stage.  It fetches real sources,
 assembles a lean candidate payload, and prints the semantic task for the Cron
@@ -23,24 +23,23 @@ from zoneinfo import ZoneInfo
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser()
 RUNTIME_ROOT = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_ROOT", str(Path(__file__).resolve().parents[1]))
+    os.environ.get("GLANCE_BRIEF_REPORTS_ROOT", str(Path(__file__).resolve().parents[1]))
 ).expanduser()
 LIB_ROOT = RUNTIME_ROOT / "lib"
 DATA_ROOT = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_DATA", str(HERMES_HOME / "data" / "glance-brief-v2"))
+    os.environ.get("GLANCE_BRIEF_NEWS_DATA", str(HERMES_HOME / "data" / "glance-brief-news"))
 ).expanduser()
-PREFETCH = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_PREFETCH", str(HERMES_HOME / "scripts" / "glance-brief" / "noon-news.py"))
-).expanduser()
+PREFETCH_VALUE = os.environ.get("GLANCE_BRIEF_NEWS_PREFETCH")
+PREFETCH = Path(PREFETCH_VALUE).expanduser() if PREFETCH_VALUE else None
 CONFIG = Path(
-    os.environ.get("GLANCE_BRIEF_PREVIEW_CONFIG", str(DATA_ROOT / "config" / "brief-live.json"))
+    os.environ.get("GLANCE_BRIEF_NEWS_CONFIG", str(DATA_ROOT / "config" / "brief-live.json"))
 ).expanduser()
 SNAPSHOT = DATA_ROOT / "source-snapshot.json"
 TZ = ZoneInfo("Asia/Shanghai")
 REPORT = "noon-news"
-MODEL = os.environ.get("GLANCE_BRIEF_PREVIEW_MODEL", "MiniMax-M3")
-PROVIDER = os.environ.get("GLANCE_BRIEF_PREVIEW_PROVIDER", "minimax-cn")
-REASONING = os.environ.get("GLANCE_BRIEF_PREVIEW_REASONING", "medium")
+MODEL = os.environ.get("GLANCE_BRIEF_NEWS_MODEL", "MiniMax-M3")
+PROVIDER = os.environ.get("GLANCE_BRIEF_NEWS_PROVIDER", "minimax-cn")
+REASONING = os.environ.get("GLANCE_BRIEF_NEWS_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
 from glance_brief import adapters, cli, contracts  # noqa: E402
@@ -78,6 +77,10 @@ def _atomic_json(path: Path, value: object) -> None:
 
 
 def _prefetch() -> dict:
+    if PREFETCH is None:
+        raise RuntimeError(
+            "GLANCE_BRIEF_NEWS_PREFETCH must point to the dedicated news source command"
+        )
     result = _run([sys.executable, str(PREFETCH)], timeout=240)
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip()
@@ -133,7 +136,7 @@ def _prepare() -> dict:
 
 def _print_agent_handoff(prepared_result: dict) -> None:
     prepared = prepared_result["prepared"]
-    print("GLANCE_BRIEF_V2_SEMANTIC_HANDOFF")
+    print("GLANCE_BRIEF_NEWS_SEMANTIC_HANDOFF")
     print(f"RUN_DIR={prepared['run_dir']}")
     print(f"SEMANTIC_OUTPUT={prepared['semantic_output']}")
     print(f"RENDER_COMMAND={prepared['render_command']}")
@@ -146,7 +149,7 @@ def _validated_run_dir(value: str) -> Path:
     run_dir = Path(value).expanduser().resolve()
     runs_root = (DATA_ROOT / "runs").resolve()
     if run_dir == runs_root or runs_root not in run_dir.parents:
-        raise RuntimeError("render run directory is outside the isolated V2 runs root")
+        raise RuntimeError("render run directory is outside the isolated reports runs root")
     if not run_dir.is_dir():
         raise RuntimeError(f"render run directory does not exist: {run_dir}")
     return run_dir
@@ -172,7 +175,7 @@ def _render_run(value: str) -> str:
     if report_date != run_dir.parent.name:
         raise RuntimeError("prepared report_date does not match run partition")
     if prepared.get("config_sha256") != _sha256(CONFIG):
-        raise RuntimeError("V2 config changed after semantic preparation")
+        raise RuntimeError("reports config changed after semantic preparation")
     if prepared.get("source_snapshot_sha256") != _sha256(SNAPSHOT):
         raise RuntimeError("source snapshot changed after semantic preparation")
 
@@ -212,9 +215,9 @@ def _render_run(value: str) -> str:
     )
     manifest = cli.load_json(run_dir / "manifest.json")
     if manifest.get("status") != "ok" or manifest.get("report") != REPORT:
-        raise RuntimeError("V2 manifest does not describe a successful noon-news run")
+        raise RuntimeError("reports manifest does not describe a successful noon-news run")
     if not report_path.is_file():
-        raise RuntimeError("V2 renderer succeeded without report.md")
+        raise RuntimeError("reports renderer succeeded without report.md")
     return report_path.read_text(encoding="utf-8").rstrip()
 
 
@@ -238,7 +241,7 @@ def _probe(prepared_result: dict) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", action="store_true", help="fetch and validate real candidates without a model call")
-    parser.add_argument("--render-run", help="validate semantic JSON and render one prepared V2 run")
+    parser.add_argument("--render-run", help="validate semantic JSON and render one prepared reports run")
     args = parser.parse_args()
 
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
@@ -247,7 +250,7 @@ def main() -> int:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise RuntimeError("another V2 Noon stage is already active") from exc
+            raise RuntimeError("another reports Noon stage is already active") from exc
         if args.render_run:
             print(_render_run(args.render_run))
             return 0
@@ -270,5 +273,5 @@ if __name__ == "__main__":
         subprocess.TimeoutExpired,
         contracts.ContractError,
     ) as exc:
-        print(f"V2 Noon runtime error: {exc}", file=sys.stderr)
+        print(f"reports Noon runtime error: {exc}", file=sys.stderr)
         raise SystemExit(1)

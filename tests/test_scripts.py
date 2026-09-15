@@ -82,26 +82,32 @@ class AdapterTests(unittest.TestCase):
             for forbidden in ("prompt", "prompt_file", "model", "provider", "skills"):
                 self.assertNotIn(forbidden, job, job)
 
-    def test_preview_job_example_matches_explicit_agent_handoff_runtime(self):
+    def test_reports_job_example_matches_explicit_agent_handoff_runtime(self):
         payload = json.loads(
-            (ROOT / "adapters/hermes/jobs.preview.example.json").read_text(encoding="utf-8")
+            (ROOT / "adapters/hermes/jobs.reports.example.json").read_text(encoding="utf-8")
         )
         manifest = json.loads(
             (ROOT / "install/install-manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(payload["mode"], "agent-handoff-preview")
-        preview = manifest["preview_runtime"]
+        self.assertEqual(payload["mode"], "agent-handoff")
+        reports = manifest["reports_runtime"]
         expected = {
             spec["cron_entrypoint"]
-            for spec in preview["entrypoints"].values()
+            for spec in reports["entrypoints"].values()
         }
         for job in payload["jobs"]:
-            self.assertRegex(job["script"], r"^glance-brief-v2/[A-Za-z0-9._-]+\.py$", job["script"])
+            self.assertRegex(job["script"], r"^glance-brief-reports/[A-Za-z0-9._-]+\.py$", job["script"])
             self.assertIn(Path(job["script"]).name, expected, job["script"])
             self.assertIs(job.get("no_agent"), False, job)
             self.assertIn("prompt_source", job)
-            self.assertIn("GLANCE_BRIEF_PREVIEW_CONFIG", job["required_environment"])
-        self.assertIn("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR", payload["jobs"][0]["required_environment"])
+            self.assertIn("environment", job)
+            if job["name"] == "agents-report":
+                self.assertEqual(
+                    job["required_environment"],
+                    ["GLANCE_BRIEF_AGENTS_PREFETCH", "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR"],
+                )
+            else:
+                self.assertEqual(job["required_environment"], ["GLANCE_BRIEF_NEWS_PREFETCH"])
 
     def test_openclaw_template_does_not_advertise_an_unimplemented_runtime_pipeline(self):
         payload = json.loads(

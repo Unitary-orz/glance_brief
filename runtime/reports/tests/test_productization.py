@@ -1,4 +1,4 @@
-"""Offline contract tests for the source-owned V2 Preview runtime."""
+"""Offline contract tests for the source-owned reports runtime."""
 from __future__ import annotations
 
 import copy
@@ -8,15 +8,15 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PREVIEW_ROOT = REPO_ROOT / "runtime" / "preview"
-CONFIG_PATH = REPO_ROOT / "config" / "brief.preview.example.json"
+REPORTS_ROOT = REPO_ROOT / "runtime" / "reports"
+CONFIG_PATH = REPO_ROOT / "config" / "brief.reports.example.json"
 
-sys.path.insert(0, str(PREVIEW_ROOT / "lib"))
+sys.path.insert(0, str(REPORTS_ROOT / "lib"))
 
 from glance_brief import adapters, contracts, render_report, resolve, source_inputs  # noqa: E402
 
 
-class PreviewInputAdapterTests(unittest.TestCase):
+class ReportsInputAdapterTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -67,7 +67,7 @@ class PreviewInputAdapterTests(unittest.TestCase):
         )
 
     def test_noon_topic_prefers_four_to_six_and_warns_at_seven(self) -> None:
-        prompt = (PREVIEW_ROOT / "lib" / "glance_brief" / "prompts" / "noon-news.md").read_text(
+        prompt = (REPORTS_ROOT / "lib" / "glance_brief" / "prompts" / "noon-news.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("默认 4–6 字", prompt)
@@ -113,7 +113,7 @@ class PreviewInputAdapterTests(unittest.TestCase):
         self.assertIn("1. **英伟达百亿入股**：", markdown)
 
     def test_agents_topic_is_a_trend_point_not_a_category_label(self) -> None:
-        prompt = (PREVIEW_ROOT / "lib" / "glance_brief" / "prompts" / "agents-report.md").read_text(
+        prompt = (REPORTS_ROOT / "lib" / "glance_brief" / "prompts" / "agents-report.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("趋势点短结论", prompt)
@@ -133,10 +133,10 @@ class PreviewInputAdapterTests(unittest.TestCase):
             adapters.validate_assembly_health(config, contracts.NOON_REPORT, assembled)
 
 
-class PreviewWrapperBoundaryTests(unittest.TestCase):
+class ReportsWrapperBoundaryTests(unittest.TestCase):
     def test_wrappers_have_no_source_registry_or_source_health_policy(self) -> None:
-        for name in ("noon_preview.py", "agents_preview.py"):
-            text = (PREVIEW_ROOT / "entrypoints" / name).read_text(encoding="utf-8")
+        for name in ("news.py", "agents.py"):
+            text = (REPORTS_ROOT / "entrypoints" / name).read_text(encoding="utf-8")
             self.assertNotIn("REQUIRED_SOURCES", text)
             self.assertNotIn("V1_PREFETCH", text)
             self.assertNotIn("news_aggregator", text)
@@ -145,14 +145,15 @@ class PreviewWrapperBoundaryTests(unittest.TestCase):
             self.assertNotIn('payload.get("codexradar")', text)
 
     def test_runtime_metadata_is_deployment_configurable_and_publication_is_explicit(self) -> None:
-        for name in ("noon_preview.py", "agents_preview.py"):
-            text = (PREVIEW_ROOT / "entrypoints" / name).read_text(encoding="utf-8")
-            self.assertIn("GLANCE_BRIEF_PREVIEW_MODEL", text)
-            self.assertIn("GLANCE_BRIEF_PREVIEW_PROVIDER", text)
-            self.assertIn("GLANCE_BRIEF_PREVIEW_REASONING", text)
+        for name in ("news.py", "agents.py"):
+            text = (REPORTS_ROOT / "entrypoints" / name).read_text(encoding="utf-8")
+            prefix = "GLANCE_BRIEF_AGENTS_" if name == "agents.py" else "GLANCE_BRIEF_NEWS_"
+            self.assertIn(f"{prefix}MODEL", text)
+            self.assertIn(f"{prefix}PROVIDER", text)
+            self.assertIn(f"{prefix}REASONING", text)
             self.assertIn('"medium"', text)
-        agents = (PREVIEW_ROOT / "entrypoints" / "agents_preview.py").read_text(encoding="utf-8")
-        self.assertIn("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR", agents)
+        agents = (REPORTS_ROOT / "entrypoints" / "agents.py").read_text(encoding="utf-8")
+        self.assertIn("GLANCE_BRIEF_AGENTS_PUBLICATION_DIR", agents)
         self.assertIn("PUBLICATION_DIR is None", agents)
         self.assertNotIn('"local-radar"', agents)
 

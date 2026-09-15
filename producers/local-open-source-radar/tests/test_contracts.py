@@ -6,7 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "producers/local-open-source-radar/prompts/report.md"
-MAIN_AGENTS_PROMPT_PATH = REPO_ROOT / "runtime/preview/lib/glance_brief/prompts/agents-report.md"
+MAIN_AGENTS_PROMPT_PATH = REPO_ROOT / "runtime/reports/lib/glance_brief/prompts/agents-report.md"
 DATA_CONTRACT_PATH = REPO_ROOT / "docs/data-contracts.md"
 
 

@@ -15,9 +15,7 @@ It never creates, edits, or removes jobs directly.
 Hermes is verified in two intentionally separate modes:
 
 - `hermes` — retained schema 2 legacy batch runtime;
-- `hermes-preview` — current V2 production agent-handoff runtime. `preview` is a
-  historical installer/runtime name kept for compatibility; it does not mean the
-  installed V2 writer is still a shadow deployment.
+- `hermes-reports` — current reports production agent-handoff runtime.
 
 OpenClaw currently has an adapter contract only and intentionally advertises no
 runnable jobs.
@@ -36,15 +34,15 @@ assembly, model payload construction, response validation, resolution,
 deterministic rendering, artifacts, and replay. It never imports Hermes or
 selects a provider.
 
-The V2 production source tree is separately owned under `runtime/preview/` and
+The reports production source tree is separately owned under `runtime/reports/` and
 contains its own schema 3 core, Report Plan and agent-handoff entry points. The
 repository keeps the schema 2 legacy line for compatibility and rollback; it is
-not the implementation used by the current V2 production writer.
+not the implementation used by the current reports production writer.
 
 The installed schema 2 Hermes report entry point owns one model invocation and
 returns raw JSON to its core. Its scheduler job therefore uses `no_agent: true`:
 this disables the outer scheduler Agent, not the model call inside the batch
-process. The V2 production jobs use the separate agent-handoff path described
+process. The reports production jobs use the separate agent-handoff path described
 below and must not be conflated with this legacy mode. Neither mode is a
 zero-token mode.
 
@@ -141,29 +139,28 @@ GLANCE_BRIEF_TIMEOUT
 Set schedule and delivery only from the user-approved values. Never commit real
 job IDs, chat IDs, credentials, or user model configuration.
 
-## 2A. Current V2 agent-handoff runtime (historical installer name)
+## 2A. Current reports agent-handoff runtime
 
-The V2 source-owned runtime is installed only by an explicit opt-in; the default
-`--runtime hermes` path above remains the schema 2 legacy batch runtime. The
-explicit `hermes-preview` name is retained so existing deployment automation can
-be inspected and migrated without silently changing paths.
+The reports source-owned runtime is installed explicitly; the default
+`--runtime hermes` path remains the schema 2 legacy batch runtime for rollback
+compatibility. The two modes have separate script and data roots.
 
 ```bash
-python3 install/install.py install --runtime hermes-preview \
+python3 install/install.py install --runtime hermes-reports \
   --components agents-report,noon-news \
   --prefix <hermes-home>
 ```
 
-This maps the committed `runtime/preview/` tree to:
+This maps the committed `runtime/reports/` tree to:
 
 ```text
-<hermes-home>/scripts/glance-brief-v2/
-  agents-v2.py, noon-v2.py       flat Cron entry points
+<hermes-home>/scripts/glance-brief-reports/
+  agents.py, news.py       flat Cron entry points
   entrypoints/                    source entrypoint copies
-  lib/glance_brief/               complete V2 core + prompts
+  lib/glance_brief/               complete reports core + prompts
   cron-prompts/                   self-contained handoff prompts
-<hermes-home>/data/glance-brief-v2/
-  config/brief.preview.example.json
+<hermes-home>/data/glance-brief-reports/
+  config/brief.reports.example.json
   config/brief-live.json          user-authored schema 3 config
   install-manifest.json           source revision + owned-file hashes
 ```
@@ -174,29 +171,38 @@ prompt, and the required deployment environment variables. It never edits
 scheduler process rather than committing them:
 
 ```text
-GLANCE_BRIEF_PREVIEW_CONFIG
-GLANCE_BRIEF_PREVIEW_PREFETCH
-GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR   # required for Agents; use the actual dated local-radar publication root
-GLANCE_BRIEF_PREVIEW_MODEL
-GLANCE_BRIEF_PREVIEW_PROVIDER
-GLANCE_BRIEF_PREVIEW_REASONING         # default medium
+GLANCE_BRIEF_AGENTS_PREFETCH          # required file
+GLANCE_BRIEF_AGENTS_PUBLICATION_DIR   # required existing local-radar publication directory
+GLANCE_BRIEF_NEWS_PREFETCH            # required file
+
+# Optional report-specific overrides:
+GLANCE_BRIEF_AGENTS_DATA
+GLANCE_BRIEF_AGENTS_CONFIG
+GLANCE_BRIEF_AGENTS_MODEL
+GLANCE_BRIEF_AGENTS_PROVIDER
+GLANCE_BRIEF_AGENTS_REASONING
+GLANCE_BRIEF_NEWS_DATA
+GLANCE_BRIEF_NEWS_CONFIG
+GLANCE_BRIEF_NEWS_MODEL
+GLANCE_BRIEF_NEWS_PROVIDER
+GLANCE_BRIEF_NEWS_REASONING
 ```
 
-Copy and customize the installed V2 example to `brief-live.json`, replace
+Copy and customize the installed reports example to `brief-live.json`, replace
 fixture paths with production source paths, then validate it with:
 
 ```bash
-<hermes-home>/scripts/glance-brief-v2/agents-v2.py --help
-<hermes-home>/scripts/glance-brief-v2/noon-v2.py --help
-python3 install/install.py verify --runtime hermes-preview --prefix <hermes-home>
+<hermes-home>/scripts/glance-brief-reports/agents.py --help
+<hermes-home>/scripts/glance-brief-reports/news.py --help
+python3 install/install.py verify --runtime hermes-reports --prefix <hermes-home>
 ```
 
-Before creating V2 jobs, inspect the scheduler for the corresponding schema 2
+Before creating reports jobs, inspect the scheduler for the corresponding schema 2
 legacy writers and choose exactly one writer per report and destination. Do not
 enable both lines merely because each passes its own health checks. Keep the old
-runtime tree and exact job records until the current V2 schedule is accepted;
+runtime tree and exact job records until the current reports schedule is accepted;
 rollback means restoring both from that backup. The sample mapping is also
-available at `adapters/hermes/jobs.preview.example.json`.
+available at `adapters/hermes/jobs.reports.example.json`.
 
 ## 4. Verify
 
@@ -206,7 +212,11 @@ After writing `brief.json` and creating approved jobs:
 python3 install/install.py verify --runtime hermes [--prefix <hermes-home>]
 ```
 
-Exit code 0 requires:
+For `hermes-reports`, exit code 0 additionally requires the two source
+prefetch bindings above (and the Agents publication directory) to exist. There
+is no implicit source-command fallback.
+
+For `hermes`, exit code 0 requires:
 
 - installed manifest present;
 - only the selected components' entry points present;

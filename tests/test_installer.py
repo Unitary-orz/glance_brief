@@ -372,13 +372,13 @@ class FormalInstallerTests(unittest.TestCase):
             self.assertTrue(any(path.endswith("lib/glance_brief/prompts/noon-news.md") for path in core_targets))
             self.assertFalse((home / "scripts").exists())
 
-    def test_preview_install_maps_complete_runtime_and_agent_jobs(self):
+    def test_reports_install_maps_complete_runtime_and_agent_jobs(self):
         with TemporaryDirectory() as temp:
             home = Path(temp)
             installed = self._run(
                 "install",
                 "--runtime",
-                "hermes-preview",
+                "hermes-reports",
                 "--components",
                 "agents-report,noon-news",
                 prefix=home,
@@ -386,27 +386,27 @@ class FormalInstallerTests(unittest.TestCase):
             self.assertEqual(installed.returncode, 0, installed.stderr)
             result = json.loads(installed.stdout)
             self.assertTrue(result["ok"])
-            self.assertEqual(result["runtime"], "hermes-preview")
+            self.assertEqual(result["runtime"], "hermes-reports")
             self.assertEqual(
                 {job["script"] for job in result["jobs_to_create"]},
-                {"glance-brief-v2/agents-v2.py", "glance-brief-v2/noon-v2.py"},
+                {"glance-brief-reports/agents.py", "glance-brief-reports/news.py"},
             )
             self.assertTrue(all(not job["no_agent"] for job in result["jobs_to_create"]))
             self.assertTrue(all("prompt" in job and "SEMANTIC_OUTPUT" in job["prompt"] for job in result["jobs_to_create"]))
 
-            runtime = home / "scripts" / "glance-brief-v2"
+            runtime = home / "scripts" / "glance-brief-reports"
             for relative in (
-                "entrypoints/agents_preview.py",
-                "entrypoints/noon_preview.py",
-                "agents-v2.py",
-                "noon-v2.py",
+                "entrypoints/agents.py",
+                "entrypoints/news.py",
+                "agents.py",
+                "news.py",
                 "lib/glance_brief/source_inputs.py",
                 "lib/glance_brief/profiles.py",
                 "lib/glance_brief/prompts/agents-report.md",
                 "lib/glance_brief/prompts/noon-news.md",
             ):
                 self.assertTrue((runtime / relative).is_file(), relative)
-            for name in ("agents-v2.py", "noon-v2.py"):
+            for name in ("agents.py", "news.py"):
                 help_run = subprocess.run(
                     [sys.executable, str(runtime / name), "--help"],
                     cwd=ROOT,
@@ -416,40 +416,107 @@ class FormalInstallerTests(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(help_run.returncode, 0, help_run.stderr)
-            self.assertTrue((home / "data" / "glance-brief-v2" / "config" / "brief.preview.example.json").is_file())
+            self.assertTrue((home / "data" / "glance-brief-reports" / "config" / "brief.reports.example.json").is_file())
 
             manifest = json.loads(
-                (home / "data" / "glance-brief-v2" / "install-manifest.json").read_text(encoding="utf-8")
+                (home / "data" / "glance-brief-reports" / "install-manifest.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(manifest["runtime"], "hermes-preview")
+            self.assertEqual(manifest["runtime"], "hermes-reports")
             self.assertEqual(manifest["source_revision"], self._git_head())
             self.assertIn("source_dirty", manifest)
             owned = {item["path"] for item in manifest["owned_files"]}
-            self.assertIn("entrypoints/agents_preview.py", owned)
-            self.assertIn("agents-v2.py", owned)
+            self.assertIn("entrypoints/agents.py", owned)
+            self.assertIn("agents.py", owned)
             self.assertIn("lib/glance_brief/source_inputs.py", owned)
 
             (home / "cron").mkdir(parents=True)
             (home / "cron" / "jobs.json").write_text(
                 json.dumps({"jobs": [
-                    {"id": "fixture-agents-v2", "name": "agents-v2", "script": "glance-brief-v2/agents-v2.py"},
-                    {"id": "fixture-noon-v2", "name": "noon-v2", "script": "glance-brief-v2/noon-v2.py"},
+                    {"id": "fixture-agents", "name": "agents", "script": "glance-brief-reports/agents.py"},
+                    {"id": "fixture-news", "name": "news", "script": "glance-brief-reports/news.py"},
                 ]}),
                 encoding="utf-8",
             )
-            preview_config = json.loads(
-                (ROOT / "config" / "brief.preview.example.json").read_text(encoding="utf-8")
+            reports_config = json.loads(
+                (ROOT / "config" / "brief.reports.example.json").read_text(encoding="utf-8")
             )
-            preview_config["reports"]["noon-news"]["input"]["path"] = str(
-                ROOT / "tests" / "fixtures" / "pipeline" / "preview-snapshot.json"
+            reports_config["reports"]["noon-news"]["input"]["path"] = str(
+                ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json"
             )
-            preview_config["reports"]["agents-report"]["input"]["path"] = str(
-                ROOT / "tests" / "fixtures" / "pipeline" / "preview-snapshot.json"
+            reports_config["reports"]["agents-report"]["input"]["path"] = str(
+                ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json"
             )
-            live_config = home / "data" / "glance-brief-v2" / "config" / "brief-live.json"
-            live_config.write_text(json.dumps(preview_config, ensure_ascii=False), encoding="utf-8")
-            verified = self._run("verify", "--runtime", "hermes-preview", prefix=home)
+            live_config = home / "data" / "glance-brief-reports" / "config" / "brief-live.json"
+            live_config.write_text(json.dumps(reports_config, ensure_ascii=False), encoding="utf-8")
+            source_dir = home / "source-commands"
+            source_dir.mkdir()
+            (source_dir / "agents-prefetch.py").write_text("# fixture\n", encoding="utf-8")
+            (source_dir / "news-prefetch.py").write_text("# fixture\n", encoding="utf-8")
+            publication_dir = home / "publication"
+            publication_dir.mkdir()
+            verify_env = {
+                **os.environ,
+                "GLANCE_BRIEF_AGENTS_PREFETCH": str(source_dir / "agents-prefetch.py"),
+                "GLANCE_BRIEF_AGENTS_PUBLICATION_DIR": str(publication_dir),
+                "GLANCE_BRIEF_NEWS_PREFETCH": str(source_dir / "news-prefetch.py"),
+            }
+            verified = subprocess.run(
+                [sys.executable, str(INSTALLER), "verify", "--runtime", "hermes-reports", "--prefix", str(home)],
+                cwd=ROOT,
+                env=verify_env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             self.assertEqual(verified.returncode, 0, verified.stdout + verified.stderr)
+
+    def test_handoff_verify_rejects_missing_prefetch_command(self):
+        with TemporaryDirectory() as temp:
+            home = Path(temp)
+            installed = self._run(
+                "install",
+                "--runtime",
+                "hermes-reports",
+                "--components",
+                "agents-report,noon-news",
+                prefix=home,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            (home / "cron").mkdir(parents=True)
+            (home / "cron" / "jobs.json").write_text(
+                json.dumps({"jobs": [
+                    {"id": "agents", "name": "agents", "script": "glance-brief-reports/agents.py"},
+                    {"id": "news", "name": "news", "script": "glance-brief-reports/news.py"},
+                ]}),
+                encoding="utf-8",
+            )
+            config = json.loads((ROOT / "config" / "brief.reports.example.json").read_text(encoding="utf-8"))
+            config["reports"]["noon-news"]["input"]["path"] = str(
+                ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json"
+            )
+            config["reports"]["agents-report"]["input"]["path"] = str(
+                ROOT / "tests" / "fixtures" / "pipeline" / "reports-snapshot.json"
+            )
+            live_config = home / "data" / "glance-brief-reports" / "config" / "brief-live.json"
+            live_config.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            env = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith(("GLANCE_BRIEF_AGENTS_", "GLANCE_BRIEF_NEWS_"))
+            }
+            env["PYTHONPYCACHEPREFIX"] = str(home / "pycache-verify")
+            verified = subprocess.run(
+                [sys.executable, str(INSTALLER), "verify", "--runtime", "hermes-reports", "--prefix", str(home)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(verified.returncode, 1, verified.stdout + verified.stderr)
+            checks = {item["check"]: item for item in json.loads(verified.stdout)["checks"]}
+            self.assertFalse(checks["source-prefetch:agents-report"]["ok"])
+            self.assertFalse(checks["source-prefetch:noon-news"]["ok"])
 
     def _git_head(self):
         return subprocess.run(

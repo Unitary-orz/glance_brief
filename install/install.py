@@ -8,10 +8,10 @@ jobs; the installing agent does that with the runtime's own job interface
 (Hermes `cronjob`), using the job suggestions printed by `install`.
 
 Actions:
-    install   --runtime hermes [--components a,b] [--prefix DIR] [--dry-run]
-    verify    --runtime hermes [--prefix DIR]
-    doctor    --runtime hermes [--prefix DIR]
-    uninstall --runtime hermes [--prefix DIR] [--dry-run]
+    install   --runtime hermes|hermes-reports [--components a,b] [--prefix DIR] [--dry-run]
+    verify    --runtime hermes|hermes-reports [--prefix DIR]
+    doctor    --runtime hermes|hermes-reports [--prefix DIR]
+    uninstall --runtime hermes|hermes-reports [--prefix DIR] [--dry-run]
 
 Semantics:
     - install is idempotent; re-running it updates project-owned files and
@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import py_compile
 import shutil
 import subprocess
@@ -43,7 +44,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = Path(__file__).resolve().parent / "install-manifest.json"
 INSTALL_MANIFEST_NAME = "install-manifest.json"
 
-# Report entry points are thin runtime adapters around the shared core.  Source
+# Report entry points are thin runtime adapters around the shared core. Source
 # acquisition is configured through the core's bounded json_file/command_json
 # drivers; the wrappers never bypass resolver or deterministic rendering.
 REPORT_ENTRYPOINT_TEMPLATE = """#!/usr/bin/env python3
@@ -163,8 +164,8 @@ def report_entrypoint(report_id: str) -> str:
     return REPORT_ENTRYPOINT_TEMPLATE.replace("__REPORT_ID__", report_id)
 
 
-PREVIEW_FLAT_ENTRYPOINT_TEMPLATE = """#!/usr/bin/env python3
-\"\"\"Installed flat wrapper for the V2 Preview semantic handoff entry point.\"\"\"
+REPORTS_FLAT_ENTRYPOINT_TEMPLATE = """#!/usr/bin/env python3
+\"\"\"Installed flat wrapper for a semantic report handoff entry point.\"\"\"
 from __future__ import annotations
 
 import os
@@ -174,16 +175,16 @@ from pathlib import Path
 RUNTIME_ROOT = Path(__file__).resolve().parent
 HERMES_HOME = RUNTIME_ROOT.parents[1]
 os.environ.setdefault("HERMES_HOME", str(HERMES_HOME))
-os.environ.setdefault("GLANCE_BRIEF_PREVIEW_ROOT", str(RUNTIME_ROOT))
+os.environ.setdefault("GLANCE_BRIEF_REPORTS_ROOT", str(RUNTIME_ROOT))
 runpy.run_path(
-    str(RUNTIME_ROOT / "entrypoints" / "__PREVIEW_ENTRYPOINT__"),
+    str(RUNTIME_ROOT / "entrypoints" / "__REPORTS_ENTRYPOINT__"),
     run_name="__main__",
 )
 """
 
 
-def preview_flat_entrypoint(entrypoint: str) -> str:
-    return PREVIEW_FLAT_ENTRYPOINT_TEMPLATE.replace("__PREVIEW_ENTRYPOINT__", entrypoint)
+def reports_flat_entrypoint(entrypoint: str) -> str:
+    return REPORTS_FLAT_ENTRYPOINT_TEMPLATE.replace("__REPORTS_ENTRYPOINT__", entrypoint)
 
 
 ENTRYPOINT_AGENTS_REPORT = report_entrypoint("agents-report")
@@ -331,11 +332,11 @@ def plan_lib_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Pat
     return pairs
 
 
-def plan_preview_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Path]]:
-    spec = manifest["preview_runtime"]
+def plan_reports_copy(manifest: dict, components: list[str]) -> list[tuple[Path, Path]]:
+    spec = manifest["reports_runtime"]
     lib_source = REPO_ROOT / spec["lib_source"]
     if not lib_source.is_dir():
-        raise SystemExit(f"ERROR: preview lib source missing: {lib_source}")
+        raise SystemExit(f"ERROR: reports lib source missing: {lib_source}")
     pairs = [
         (source, Path("lib") / "glance_brief" / source.relative_to(lib_source))
         for source in sorted(lib_source.rglob("*"))
@@ -345,20 +346,20 @@ def plan_preview_copy(manifest: dict, components: list[str]) -> list[tuple[Path,
         entry = spec["entrypoints"].get(component)
         prompt = spec["cron_prompts"].get(component)
         if not isinstance(entry, dict) or not isinstance(prompt, str):
-            raise SystemExit(f"ERROR: preview runtime mapping missing for {component}")
+            raise SystemExit(f"ERROR: reports runtime mapping missing for {component}")
         source = REPO_ROOT / entry["source"]
         prompt_source = REPO_ROOT / prompt
         if not source.is_file():
-            raise SystemExit(f"ERROR: preview entrypoint source missing: {source}")
+            raise SystemExit(f"ERROR: reports entrypoint source missing: {source}")
         if not prompt_source.is_file():
-            raise SystemExit(f"ERROR: preview Cron prompt missing: {prompt_source}")
+            raise SystemExit(f"ERROR: reports Cron prompt missing: {prompt_source}")
         pairs.append((source, Path(entry["installed"])))
         pairs.append((prompt_source, Path("cron-prompts") / Path(prompt).name))
     return pairs
 
 
-def is_preview_runtime(runtime_spec: dict) -> bool:
-    return runtime_spec.get("kind") == "preview-agent-handoff"
+def is_reports_runtime(runtime_spec: dict) -> bool:
+    return runtime_spec.get("kind") == "agent-handoff"
 
 
 def runtime_entrypoint_names(installed: dict | None) -> set[str]:
@@ -394,42 +395,57 @@ def repository_provenance() -> dict[str, object]:
     return {"source_revision": revision, "source_dirty": bool(status)}
 
 
-def preview_job_suggestions(manifest: dict, components: list[str], runtime_spec: dict) -> dict[str, dict]:
-    preview = manifest["preview_runtime"]
+def reports_job_suggestions(manifest: dict, components: list[str], runtime_spec: dict) -> dict[str, dict]:
+    reports = manifest["reports_runtime"]
     script_dir = Path(runtime_spec["scripts_dir"]).name
     jobs = {}
     for component in components:
-        entry = preview["entrypoints"][component]
-        prompt_path = REPO_ROOT / preview["cron_prompts"][component]
-        required_environment = [
-            "GLANCE_BRIEF_PREVIEW_CONFIG",
-            "GLANCE_BRIEF_PREVIEW_PREFETCH",
-            "GLANCE_BRIEF_PREVIEW_MODEL",
-            "GLANCE_BRIEF_PREVIEW_PROVIDER",
-            "GLANCE_BRIEF_PREVIEW_REASONING",
-        ]
-        if component == "agents-report":
-            required_environment.append("GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR")
+        entry = reports["entrypoints"][component]
+        prompt_path = REPO_ROOT / reports["cron_prompts"][component]
         jobs[component] = {
             "name": component,
             "script": f"{script_dir}/{entry['cron_entrypoint']}",
             "no_agent": False,
             "prompt": prompt_path.read_text(encoding="utf-8"),
             "default_schedule": manifest["components"][component]["default_schedule"],
-            "required_environment": required_environment,
+            "environment": entry["environment"],
+            "required_environment": entry.get("required_environment", []),
         }
     return jobs
 
 
+def required_environment_status(environment_name: str) -> tuple[bool, str]:
+    value = os.environ.get(environment_name, "").strip()
+    if not value:
+        return False, f"{environment_name} is not set"
+    path = Path(value).expanduser()
+    if environment_name.endswith("_PREFETCH"):
+        ok = path.is_file()
+        return ok, str(path) if ok else f"prefetch command file not found: {path}"
+    if environment_name.endswith("_PUBLICATION_DIR"):
+        ok = path.is_dir()
+        return ok, str(path) if ok else f"publication directory not found: {path}"
+    return True, value
+
+
+def reports_required_environment(manifest: dict, components: list[str]) -> list[tuple[str, str]]:
+    requirements = []
+    for component in components:
+        entry = manifest["reports_runtime"]["entrypoints"][component]
+        for name in entry.get("required_environment", []):
+            requirements.append((component, name))
+    return requirements
+
+
 def single_writer_conflicts(manifest: dict, jobs: list[dict], runtime_spec: dict) -> list[dict]:
-    if not is_preview_runtime(runtime_spec):
+    if not is_reports_runtime(runtime_spec):
         return []
-    preview = manifest["preview_runtime"]["entrypoints"]
+    reports = manifest["reports_runtime"]["entrypoints"]
     conflicts = []
     for component, component_spec in manifest["components"].items():
         writer_names = {component_spec["entrypoint"]}
-        if component in preview:
-            writer_names.add(preview[component]["cron_entrypoint"])
+        if component in reports:
+            writer_names.add(reports[component]["cron_entrypoint"])
         active = [
             {
                 "id": job.get("id"),
@@ -460,7 +476,7 @@ def cmd_install(args) -> int:
     manifest = load_json(MANIFEST_PATH)
     home = hermes_home(args.prefix)
     rt = manifest["runtime_adapters"][args.runtime]
-    preview_runtime = is_preview_runtime(rt)
+    reports_runtime = is_reports_runtime(rt)
     scripts_root = home / rt["scripts_dir"]
     data_root = home / rt["data_dir"]
 
@@ -484,15 +500,15 @@ def cmd_install(args) -> int:
         "dirs": [],
     }
 
-    if preview_runtime:
+    if reports_runtime:
         core_pairs = []
         lib_pairs = []
-        runtime_pairs = plan_preview_copy(manifest, components)
+        runtime_pairs = plan_reports_copy(manifest, components)
         entry_files = [
             (
-                manifest["preview_runtime"]["entrypoints"][component]["cron_entrypoint"],
-                preview_flat_entrypoint(
-                    Path(manifest["preview_runtime"]["entrypoints"][component]["installed"]).name
+                manifest["reports_runtime"]["entrypoints"][component]["cron_entrypoint"],
+                reports_flat_entrypoint(
+                    Path(manifest["reports_runtime"]["entrypoints"][component]["installed"]).name
                 ),
             )
             for component in components
@@ -511,7 +527,7 @@ def cmd_install(args) -> int:
     # project-owned runtime files (always updated on re-install)
     for src, rel in runtime_pairs:
         changes["runtime_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
-        if not preview_runtime and rel in core_rels:
+        if not reports_runtime and rel in core_rels:
             changes["core_files"].append(str(scripts_root / rel))
         elif str(rel).startswith("lib/"):
             changes["lib_files"].append({"src": str(src), "dst": str(scripts_root / rel)})
@@ -521,10 +537,10 @@ def cmd_install(args) -> int:
         changes["entrypoints"].append(str(scripts_root / name))
 
     # default configs (only when target missing)
-    if preview_runtime:
-        preview_spec = manifest["preview_runtime"]
-        config_template = preview_spec["config_template"]
-        config_target = preview_spec["config_target"]
+    if reports_runtime:
+        reports_spec = manifest["reports_runtime"]
+        config_template = reports_spec["config_template"]
+        config_target = reports_spec["config_target"]
     else:
         core_config = manifest["core"]
         config_template = core_config["config_template"]
@@ -535,7 +551,7 @@ def cmd_install(args) -> int:
             "template": config_template,
             "dst": str(core_config_dst),
         })
-    if not preview_runtime:
+    if not reports_runtime:
         for comp in components:
             for target, template_rel in manifest["components"][comp].get("config_templates", {}).items():
                 dst = data_root / "config" / target
@@ -580,15 +596,15 @@ def cmd_install(args) -> int:
         dst = scripts_root / name
         owned.append({"path": name, "sha256": sha256(dst)})
 
-    if preview_runtime:
-        preview_spec = manifest["preview_runtime"]
-        jobs = preview_job_suggestions(manifest, components, rt)
+    if reports_runtime:
+        reports_spec = manifest["reports_runtime"]
+        jobs = reports_job_suggestions(manifest, components, rt)
         installed_entrypoints = {
-            component: preview_spec["entrypoints"][component]["cron_entrypoint"]
+            component: reports_spec["entrypoints"][component]["cron_entrypoint"]
             for component in components
         }
-        user_config_files = [f"config/{preview_spec['config_target']}"]
-        runtime_config_file = f"config/{preview_spec['runtime_config_target']}"
+        user_config_files = [f"config/{reports_spec['config_target']}"]
+        runtime_config_file = f"config/{reports_spec['runtime_config_target']}"
     else:
         jobs = {
             comp: {
@@ -622,7 +638,7 @@ def cmd_install(args) -> int:
         "components": components,
         "scripts_dir": rt["scripts_dir"],
         "data_dir": rt["data_dir"],
-        "core_entrypoint": None if preview_runtime else manifest["core"]["entrypoint"],
+        "core_entrypoint": None if reports_runtime else manifest["core"]["entrypoint"],
         "entrypoints": installed_entrypoints,
         "jobs": jobs,
         "owned_files": owned,
@@ -651,17 +667,13 @@ def cmd_install(args) -> int:
             *([
                 {
                     "action": "configure_scheduler_environment",
-                    "variables": [
-                        "GLANCE_BRIEF_PREVIEW_CONFIG",
-                        "GLANCE_BRIEF_PREVIEW_PREFETCH",
-                        "GLANCE_BRIEF_PREVIEW_PUBLICATION_DIR",
-                        "GLANCE_BRIEF_PREVIEW_MODEL",
-                        "GLANCE_BRIEF_PREVIEW_PROVIDER",
-                        "GLANCE_BRIEF_PREVIEW_REASONING",
-                    ],
-                    "note": "Set deployment-specific values in the scheduler process; no live paths or credentials are stored by the installer.",
+                    "variables": list(dict.fromkeys(
+                        name
+                        for _component, name in reports_required_environment(manifest, components)
+                    )),
+                    "note": "Set each source prefetch command and publication directory in the scheduler process; no live paths or credentials are stored by the installer.",
                 }
-            ] if preview_runtime else []),
+            ] if reports_runtime else []),
         ],
         "jobs_to_create": list(installed["jobs"].values()),
     }
@@ -699,10 +711,10 @@ def cmd_verify(args) -> int:
                 if isinstance(item.get("path"), str) and not item["path"].startswith("lib/")
             }
         )
-    elif is_preview_runtime(rt):
+    elif is_reports_runtime(rt):
         expected_entrypoints = sorted(
             entry["cron_entrypoint"]
-            for entry in manifest["preview_runtime"]["entrypoints"].values()
+            for entry in manifest["reports_runtime"]["entrypoints"].values()
         )
     else:
         expected_entrypoints = [manifest["core"]["entrypoint"]]
@@ -742,6 +754,21 @@ def cmd_verify(args) -> int:
                 int(installed.get("config_schema_version", rt.get("config_schema_version", 2))),
             )
             add("runtime-config", valid, detail)
+
+    # Agent-handoff runtimes intentionally have no implicit source fallback.
+    # Verify the external producer boundary instead of reporting an installation
+    # as healthy when the first Cron invocation would fail with ENOENT.
+    if installed and is_reports_runtime(rt):
+        for component, environment_name in reports_required_environment(
+            manifest, installed.get("components", [])
+        ):
+            valid, detail = required_environment_status(environment_name)
+            check_name = (
+                f"source-prefetch:{component}"
+                if environment_name.endswith("_PREFETCH")
+                else f"required-environment:{component}:{environment_name}"
+            )
+            add(check_name, valid, detail)
 
     # cron wiring: a job whose script resolves to our installed entrypoints.
     # Hermes job `script` is relative to $HERMES_HOME/scripts/.
@@ -860,6 +887,23 @@ def cmd_doctor(args) -> int:
                 int(installed.get("config_schema_version", rt.get("config_schema_version", 2))),
             )
             emit("runtime", "runtime-config", "ok" if valid else "error", detail)
+
+        if is_reports_runtime(rt):
+            for component, environment_name in reports_required_environment(
+                manifest, installed.get("components", [])
+            ):
+                valid, detail = required_environment_status(environment_name)
+                name = (
+                    f"source-prefetch:{component}"
+                    if environment_name.endswith("_PREFETCH")
+                    else f"required-environment:{component}:{environment_name}"
+                )
+                emit(
+                    f"component:{component}",
+                    name,
+                    "ok" if valid else "error",
+                    detail,
+                )
 
     # dependencies and external skills (shared, hints)
     for dep in manifest.get("python_deps", []):
@@ -1019,21 +1063,21 @@ def main() -> int:
     sub = parser.add_subparsers(dest="action", required=True)
 
     p_install = sub.add_parser("install", help="install or update project-owned files")
-    p_install.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
+    p_install.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-reports"])
     p_install.add_argument("--components", default="", help="comma-separated components")
     p_install.add_argument("--prefix", default="", help="runtime home (default: $HERMES_HOME or ~/.hermes)")
     p_install.add_argument("--dry-run", action="store_true")
 
     p_verify = sub.add_parser("verify", help="verify installed state")
-    p_verify.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
+    p_verify.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-reports"])
     p_verify.add_argument("--prefix", default="")
 
     p_doctor = sub.add_parser("doctor", help="runtime health check (read-only)")
-    p_doctor.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
+    p_doctor.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-reports"])
     p_doctor.add_argument("--prefix", default="")
 
     p_uninstall = sub.add_parser("uninstall", help="remove project-owned files (keeps user config)")
-    p_uninstall.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-preview"])
+    p_uninstall.add_argument("--runtime", default="hermes", choices=["hermes", "hermes-reports"])
     p_uninstall.add_argument("--prefix", default="")
     p_uninstall.add_argument("--dry-run", action="store_true")
 

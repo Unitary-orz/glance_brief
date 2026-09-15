@@ -126,7 +126,7 @@
       "title": "今日热点简报",
       "input": {
         "driver": "json_file",
-        "path": "../tests/fixtures/pipeline/preview-snapshot.json"
+        "path": "../tests/fixtures/pipeline/reports-snapshot.json"
       },
       "features": {
         "top_points": {
@@ -185,7 +185,7 @@
       "title": "agents-radar 生态报告",
       "input": {
         "driver": "json_file",
-        "path": "../tests/fixtures/pipeline/preview-snapshot.json"
+        "path": "../tests/fixtures/pipeline/reports-snapshot.json"
       },
       "features": {},
       "components": [

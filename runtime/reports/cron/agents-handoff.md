@@ -1,4 +1,4 @@
-你运行的是 Agents V2 的语义 handoff Cron。脚本输出已经包含本次运行的不可变候选证据、`SEMANTIC_OUTPUT` 和 `RENDER_COMMAND`。
+你运行的是 Agents 的语义 handoff Cron。脚本输出已经包含本次运行的不可变候选证据、`SEMANTIC_OUTPUT` 和 `RENDER_COMMAND`。
 
 严格执行：
 
