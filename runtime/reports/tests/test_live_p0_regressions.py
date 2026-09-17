@@ -6,6 +6,7 @@ RUNTIME = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME / "lib"))
 
 from glance_brief import adapters, contracts, render_report, resolve  # noqa: E402
+from glance_brief.source_adapters import generic  # noqa: E402
 
 
 class LiveP0RegressionTests(unittest.TestCase):
@@ -86,7 +87,7 @@ class LiveP0RegressionTests(unittest.TestCase):
             "summary": "国航回应称飞机在地面保障期间发生设备刮碰，具体原因仍在调查。",
         }
 
-        candidate = adapters.normalize_candidate("news_aggregator", source, raw)
+        candidate = generic.normalize_candidate("news_aggregator", source, raw)
 
         self.assertEqual(candidate["text"], raw["summary"])
 
@@ -100,7 +101,7 @@ class LiveP0RegressionTests(unittest.TestCase):
             "title": "国际金价两日大跌160美元，‘乱世买黄金’为何失灵？",
         }
 
-        candidate = adapters.normalize_candidate("news_aggregator", source, raw)
+        candidate = generic.normalize_candidate("news_aggregator", source, raw)
 
         self.assertEqual(candidate["title"], raw["title"])
 
@@ -142,7 +143,7 @@ class LiveP0RegressionTests(unittest.TestCase):
             contracts.ContractError,
             "question headline needs independent evidence text",
         ):
-            adapters.normalize_candidate("news_aggregator", source, raw)
+            generic.normalize_candidate("news_aggregator", source, raw)
 
 
 if __name__ == "__main__":

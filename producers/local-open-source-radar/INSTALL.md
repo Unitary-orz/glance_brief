@@ -12,6 +12,8 @@ The producer owns:
 - relevance filtering, source-aware ranking, and independent hot/fresh/discovery signal pools with explicit selection diagnostics;
 - technical evidence collection for selected new projects;
 - the current-day JSON snapshot, selection diagnostics, and its quality status.
+- the independent publication handoff: one immutable source snapshot, a
+  constrained semantic JSON response, and a deterministic Markdown renderer.
 
 The root installer does **not** install or schedule this producer by default.
 The source package includes the environment-independent generic report Prompt at
@@ -28,6 +30,8 @@ A deployment may use the following layout:
 <runtime-root>/scripts/local-open-source-radar/
   collector.py
   prefetch.py
+  handoff.py
+  render.py
   read-current.py
 
 <runtime-root>/data/local-open-source-radar/
@@ -35,6 +39,7 @@ A deployment may use the following layout:
   state/state.json
   cache/
   output/
+  runs/<run-id>/
 ```
 
 Copy `config.example.json` to the runtime data directory and adjust only the
@@ -53,9 +58,12 @@ LOCAL_OPEN_SOURCE_RADAR_STATE
 LOCAL_OPEN_SOURCE_RADAR_OUTPUT_DIR
 ```
 
-`read-current.py` reads the producer snapshot directly. Its structured
-`categories` mapping is the source for the report category/project mapping; no
-rendered Markdown report directory is required.
+`read-current.py` reads the producer snapshot directly for downstream source
+consumers. The independent radar publication uses `handoff.py`: it freezes the
+collector result under `runs/<run-id>/source-input.json`, lets the model write
+only `semantic-output.json`, and invokes `render.py`. The renderer owns all
+URLs, Stars, dates, fresh markers, category headings/order, project coverage,
+and the final Markdown layout; a failed contract never writes `report.md`.
 
 ## GitHub access
 
@@ -74,11 +82,21 @@ python3 collector.py \
   --output-dir <runtime-root>/data/local-open-source-radar/output
 ```
 
-The cron wrapper is:
+The raw collection wrapper is:
 
 ```bash
 python3 prefetch.py
 ```
+
+The independent-report Cron wrapper is:
+
+```bash
+python3 handoff.py
+```
+
+`handoff.py` prints the run-specific `SOURCE_INPUT`, `SEMANTIC_OUTPUT`, and
+`RENDER_COMMAND` contract for the scheduled agent. The scheduled job must
+allow only file and terminal tools; it must not generate Markdown directly.
 
 Read today's snapshot without collecting again:
 

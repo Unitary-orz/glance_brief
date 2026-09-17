@@ -78,13 +78,25 @@ category_definitions[]
 `hot_today` 是完整 ranked pool 按热度上限选出的当前热门项目；`fresh_hot`
 必须是 `hot_today` 的子集；每个项目的 GitHub URL 必须精确匹配其
 `owner/repo`。`full_selection_pool_count` 记录完整 ranked pool 的规模，不能
-用受 artifact cap 截断后的列表冒充选择池。`categories` 是稳定的结构化
-分类映射；legacy reader 可将它规范化为 `local_report_categories`，并要求
-无重复地完整覆盖 `hot_today`。
+用受 artifact cap 截断后的列表冒充选择池。`categories` 是采集快照中的 legacy 结构化分类映射，供只读 snapshot
+consumer 使用；它不作为独立日报模型的最终语义分类输入。独立日报的语义
+分类由 semantic handoff 产生，并由 source-owned renderer 按
+`category_definitions` 顺序校验和排版。
 
-producer 的 publication 只提供项目事实、信号和诊断，不提供最终报告
-Markdown。独立 radar Prompt 可以生成 `**✨ 本期新入榜**` 版块，并在“今日热门”分类中按
-“最热”与“其他”两行规则排版；但主
+producer 的 collector snapshot 只提供项目事实、信号和诊断，不让模型直接
+生成最终报告 Markdown。独立 radar 的 publication 流程是：
+
+```text
+prefetch.py
+  -> handoff.py: immutable source-input.json
+  -> model: semantic-output.json
+  -> render.py: validated report.md
+```
+
+renderer 锁定项目 URL、Star、日期、fresh 标记、分类标题/顺序、每类“最热”与“其他”行、项目覆盖和
+最终版式；任何 semantic contract 失败都不得生成 `report.md`。独立 radar
+Prompt 只填写 semantic JSON，不直接排版 `**✨ 本期新入榜**` 或“今日热门”
+分类行。主
 `agents-report` 的 Prompt 不能把该版块混入主报告；主报告的
 `**✨新热门开源**` 标题与版式由各自 renderer 根据程序确定的
 `open_source_display_ids` 生成。
@@ -126,8 +138,8 @@ aihot
 基础上增加 `snapshot_json`：报告的 `input` 由 core 只读取一次，所有声明
 `driver: snapshot_json` 的来源通过注册式 input adapter 查看该 payload，
 再按各自的 `items_path` 和 `map` 规范化。assembler 不识别具体来源 driver
-来分支；`report_json` 仅为旧 live 配置提供兼容别名，新配置必须写
-`snapshot_json`。来源读取错误先按 source 记录并隔离，Report Plan 的
+来分支；共享快照来源统一使用明确的 `snapshot_json` driver，不再保留
+`report_json` 兼容别名。来源读取错误先按 source 记录并隔离，Report Plan 的
 `required` 与 `minimum_candidates` 再统一决定是否 hard fail。
 
 reports production 的可执行入口、Prompt、fixture 和测试位于

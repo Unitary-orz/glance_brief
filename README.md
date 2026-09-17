@@ -12,7 +12,7 @@
 
 ### `local-open-source-radar`：独立开源雷达 producer
 
-独立采集 GitHub AI 开源项目，生成当天的热门项目、趋势和分类快照；`agents-report` 只消费这份结构化 publication，不把 producer 的定时任务或运行状态塞进报告 core。它不属于根安装器默认安装的报告组件，源码和运行契约见 [`producers/local-open-source-radar/`](producers/local-open-source-radar/)。
+独立采集 GitHub AI 开源项目，生成当天的热门项目、趋势和分类快照；source-owned renderer 负责独立 publication 的最终 Markdown，`agents-report` 消费这份经过校验的来源数据，不把 producer 的定时任务或运行状态塞进报告 core。它不属于根安装器默认安装的报告组件，源码和运行契约见 [`producers/local-open-source-radar/`](producers/local-open-source-radar/)。
 
 ### `noon-news`：午间热点简报
 
@@ -54,8 +54,7 @@ producer JSON
 当前 reports 的安装映射仍使用历史兼容名 `--runtime hermes-reports`，将源码映射到
 `glance-brief-reports`。该模式只安装文件、记录 source revision/owned-file hashes
 并输出 Cron 建议，不自动修改 Cron、投递或 live runtime。reports 通过注册式
-`snapshot_json` input adapter 让多个来源查看同一份不可变输入；`report_json` 只作兼容别名。
-
+`snapshot_json` input adapter 让多个来源查看同一份不可变输入。
 详见：
 
 - [架构](docs/architecture.md)

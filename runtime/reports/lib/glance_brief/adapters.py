@@ -1,4 +1,4 @@
-"""Report-plan assembly facade and compatibility exports for source adapters."""
+"""Report-plan assembly and source-boundary validation."""
 from __future__ import annotations
 
 import copy
@@ -138,9 +138,9 @@ def _validate_source(source_id: str, source: Any) -> None:
             f"sources.{source_id}.adapter must be a non-empty string"
         )
     driver = source.get("driver")
-    if driver not in {"json_file", "command_json", "snapshot_json", "report_json"}:
+    if driver not in {"json_file", "command_json", "snapshot_json"}:
         raise contracts.ContractError(
-            f"sources.{source_id}.driver must be json_file, command_json, snapshot_json, or report_json"
+            f"sources.{source_id}.driver must be json_file, command_json, or snapshot_json"
         )
     if driver == "json_file" and not isinstance(source.get("path"), str):
         raise contracts.ContractError(f"sources.{source_id}.path must be a string")
@@ -158,7 +158,7 @@ def _validate_source(source_id: str, source: Any) -> None:
         if len(set(allowlist)) != len(allowlist):
             raise contracts.ContractError(f"sources.{source_id}.env_allowlist must not contain duplicates")
     if "items_path" in source:
-        _specs(source["items_path"], f"sources.{source_id}.items_path")
+        source_adapters.generic.path_specs(source["items_path"], f"sources.{source_id}.items_path")
     for name in ("channel_id", "channel_label"):
         if name in source and (not isinstance(source[name], str) or not source[name]):
             raise contracts.ContractError(f"sources.{source_id}.{name} must be a non-empty string")
@@ -180,14 +180,14 @@ def _validate_source(source_id: str, source: Any) -> None:
         raise contracts.ContractError(f"sources.{source_id}.map.strip_urls_from_text must be a boolean")
     for name in ("title", "text", "published_at"):
         if name in mapping:
-            _specs(mapping[name], f"sources.{source_id}.map.{name}")
+            source_adapters.generic.path_specs(mapping[name], f"sources.{source_id}.map.{name}")
     extra = mapping.get("extra", {})
     if not isinstance(extra, Mapping):
         raise contracts.ContractError(f"sources.{source_id}.map.extra must be an object")
     for name, spec in extra.items():
         if not isinstance(name, str) or not name:
             raise contracts.ContractError(f"sources.{source_id}.map.extra keys must be strings")
-        _specs(spec, f"sources.{source_id}.map.extra.{name}")
+        source_adapters.generic.path_specs(spec, f"sources.{source_id}.map.extra.{name}")
     links = mapping.get("links", [])
     if not isinstance(links, list):
         raise contracts.ContractError(f"sources.{source_id}.map.links must be an array")
@@ -213,7 +213,7 @@ def _validate_source(source_id: str, source: Any) -> None:
     if set(snapshot) - _SNAPSHOT_FIELDS:
         raise contracts.ContractError(f"sources.{source_id}.snapshot has unknown fields")
     for name, spec in snapshot.items():
-        _specs(spec, f"sources.{source_id}.snapshot.{name}")
+        source_adapters.generic.path_specs(spec, f"sources.{source_id}.snapshot.{name}")
 
 
 def _validate_binding(binding: Any, sources: Mapping[str, Any], path: str) -> None:
@@ -694,18 +694,3 @@ def source_urls(assembled: Mapping[str, Any]) -> set[str]:
         if isinstance(candidate, Mapping)
         for url_value in _candidate_urls(candidate)
     }
-
-
-# Compatibility exports.  Generic source mapping is implemented in the
-# source_adapters package; these names remain for callers of the old facade.
-get_path = source_adapters.generic.get_path
-_specs = source_adapters.generic._specs
-_pick = source_adapters.generic._pick
-_label = source_adapters.generic._label
-_strip_urls = source_adapters.generic._strip_urls
-candidate_id_for = source_adapters.generic.candidate_id_for
-_link_entries = source_adapters.generic._link_entries
-normalize_candidate = source_adapters.generic.normalize_candidate
-_items = source_adapters.generic._items
-_is_excluded = source_adapters.generic._is_excluded
-_snapshot = source_adapters.generic._snapshot

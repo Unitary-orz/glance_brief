@@ -441,12 +441,12 @@ class FormalInstallerTests(unittest.TestCase):
                 "lib/glance_brief/source_adapters/__init__.py",
                 "lib/glance_brief/source_adapters/generic.py",
                 "lib/glance_brief/source_adapters/local_open_source_radar.py",
-                "lib/glance_brief/source_inputs.py",
                 "lib/glance_brief/profiles.py",
                 "lib/glance_brief/prompts/agents-report.md",
                 "lib/glance_brief/prompts/noon-news.md",
             ):
                 self.assertTrue((runtime / relative).is_file(), relative)
+            self.assertFalse((runtime / "lib/glance_brief/source_inputs.py").exists())
             for name in ("agents.py", "news.py"):
                 help_run = subprocess.run(
                     [sys.executable, str(runtime / name), "--help"],
@@ -471,7 +471,7 @@ class FormalInstallerTests(unittest.TestCase):
             self.assertIn("lib/glance_brief/input_adapters/__init__.py", owned)
             self.assertIn("lib/glance_brief/source_adapters/generic.py", owned)
             self.assertIn("lib/glance_brief/source_adapters/local_open_source_radar.py", owned)
-            self.assertIn("lib/glance_brief/source_inputs.py", owned)
+            self.assertNotIn("lib/glance_brief/source_inputs.py", owned)
 
             (home / "cron").mkdir(parents=True)
             (home / "cron" / "jobs.json").write_text(

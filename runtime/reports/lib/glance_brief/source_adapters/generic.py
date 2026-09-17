@@ -47,6 +47,11 @@ def _specs(spec: Any, path: str) -> list[str]:
     raise contracts.ContractError(f"{path} must be a path string or non-empty path array")
 
 
+def path_specs(spec: Any, path: str) -> list[str]:
+    """Validate and normalize a configured dotted-path specification."""
+    return _specs(spec, path)
+
+
 def _pick(raw: Mapping[str, Any], spec: Any, path: str, default: Any = None) -> Any:
     for candidate_path in _specs(spec, path):
         value = get_path(raw, candidate_path, None)

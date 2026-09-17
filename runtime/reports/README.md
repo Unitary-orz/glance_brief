@@ -20,7 +20,6 @@ lib/glance_brief/
   source_adapters/             source adaptation registry and implementations
     generic.py                  configured items_path / map / snapshot adapter
     local_open_source_radar.py  local-radar publication compatibility adapter
-  source_inputs.py            compatibility facade for input_adapters
   contracts.py                canonical data and validation contracts
   profiles.py                 schema-3 Report Plan compiler
   resolve.py                  semantic resolver and fact restoration
@@ -33,8 +32,7 @@ tests/                          offline and boundary regression tests
 
 - A source prefetch command owns network/API access, raw snapshots, source
   compatibility, source metadata, and source-specific exceptions.
-- `input_adapters/` only loads a bounded payload; `source_inputs.py` is a
-  compatibility facade for that package.
+- `input_adapters/` only loads a bounded payload. Its package is the direct input-driver boundary.
 - `source_adapters/` is the source adaptation boundary. `generic.py` handles configured
   `items_path`, `map`, `exclude`, and `snapshot`; special payload or publication
   semantics can register a sibling adapter. Source IDs and adapter IDs remain
@@ -46,8 +44,9 @@ tests/                          offline and boundary regression tests
 - The Hermes wrappers own orchestration and model metadata. They do not define
   source registries or source health policy.
 
-`report_json` remains a compatibility alias for `snapshot_json`; new configs
-should use `snapshot_json`.
+All schema-3 sources use the explicit `snapshot_json` driver when reading the
+shared immutable prefetch snapshot. There is no `report_json` compatibility
+alias in the reports runtime.
 
 ## Repository-to-Hermes mapping
 

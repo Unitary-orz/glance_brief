@@ -52,8 +52,9 @@ runtime adapter / delivery
 负责来源访问、筛选、排序、分类和当天 publication。根安装器不自动安装或创建
 它的 Cron；reports Agents 通过 runtime 明确提供的
 `GLANCE_BRIEF_AGENTS_PUBLICATION_DIR` 消费已发布快照，schema 2 legacy 线
-则可通过 `LOCAL_OPEN_SOURCE_RADAR_READER` 使用兼容 reader。报告 core 不解析
-producer 的调度状态，也不从渲染后的独立报告反推事实。
+则可通过 `LOCAL_OPEN_SOURCE_RADAR_READER` 使用兼容 reader。独立 radar 的
+publication 由 source-owned semantic handoff 和 deterministic renderer 生成；
+报告 core 不解析 producer 的调度状态，也不从渲染后的独立报告反推事实。
 
 ### 模型
 
@@ -96,12 +97,14 @@ reports 的来源输入分为两层：`input_adapters/` 中的 `json_file`、
 `adapter_id` 将 payload 映射为统一的候选、snapshot 和 diagnostics 结果。默认
 `generic` adapter 处理 `items_path`、`map`、`exclude` 和 `snapshot`，只有来源存在
 额外 payload/publication 语义时才注册专用 adapter。`source_id` 表示来源，
-`adapter_id` 表示处理实现，二者不绑定。`source_inputs.py` 仅为兼容旧 import 的
-facade。所有来源都经同一个 input-driver 和 source-adapter 边界进入 assembly；
+`adapter_id` 表示处理实现，二者不绑定。`input_adapters/` 和
+`source_adapters/` 分别是输入读取与来源映射的直接实现边界；不再保留旧 facade。
+所有来源都经同一个 input-driver 和 source-adapter 边界进入 assembly；
 assembler 不再直接实现通用字段映射。
 
 具有特殊 payload/publication 语义的来源可以通过 `source_adapters/` registry 接入；
-当前 `open_source_radar` 的 Markdown publication 仍使用兼容桥。News 的
+当前 `open_source_radar` 的 Markdown publication 由 local-radar source-owned
+renderer 生成，reports runtime 的 Markdown reader 仍作为兼容桥校验它。News 的
 `rss_summary`、`news_aggregator` 和 `aihot` 走 `generic` adapter，不进入来源特判模块。
 
 Wrapper 只负责运行 producer、锁、路径和 handoff；required source、最小候选

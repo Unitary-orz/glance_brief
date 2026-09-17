@@ -17,16 +17,15 @@ class SourceContractTests(unittest.TestCase):
             return
         prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("**✨ 本期新入榜**", prompt)
-        self.assertIn("- [owner/repo](原始URL)「一句话中文简介」(+X★/日)", prompt)
-        self.assertIn("禁止添加 `最热：`、`热门：`、`新入榜：` 或 `✨ ` 前缀", prompt)
-        self.assertIn("最热", prompt)
-        self.assertIn("其他", prompt)
-        self.assertIn("is_fresh_hot", prompt)
-        self.assertIn("✨ [owner/repo](URL)", prompt)
-        self.assertIn("category_definitions", prompt)
-        self.assertIn("模型输入不会提供任何预计算的项目分类映射", prompt)
-        self.assertIn("只有 fresh 项目行末的 `（分类）` 后缀才去掉", prompt)
+        self.assertIn("SEMANTIC_OUTPUT", prompt)
+        self.assertIn("RENDER_COMMAND", prompt)
+        self.assertIn("schema_version", prompt)
+        self.assertIn("categories", prompt)
+        self.assertIn("hot", prompt)
+        self.assertIn("fresh", prompt)
+        self.assertIn("new_projects", prompt)
+        self.assertIn("不要写 Markdown", prompt)
+        self.assertIn("只输出 renderer 的 stdout", prompt)
 
     def test_report_prompt_is_environment_independent(self):
         self.assertTrue(PROMPT_PATH.is_file(), f"missing source report prompt: {PROMPT_PATH}")

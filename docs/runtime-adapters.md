@@ -93,14 +93,14 @@ The default reports reasoning metadata is `medium`; scheduler/environment values
 the deployment authority.
 
 The `snapshot_json` input driver is the explicit bridge from one report input
-into multiple source views. Its implementation lives under `input_adapters/`;
-`source_inputs.py` remains only as a compatibility facade. Sources use the
-`source_adapters/` registry after input loading: the default `generic` adapter
-applies configured `items_path`, `map`, `exclude`, and `snapshot` rules, while
-special payload/publication semantics may use a sibling adapter. `source_id`
-identifies a source and `adapter_id` identifies the reusable implementation.
-The local-radar Markdown bridge remains a compatibility adapter. `report_json`
-remains a compatibility alias only. New configs should use `snapshot_json`.
+into multiple source views. Its implementation lives directly under
+`input_adapters/`. Sources use the `source_adapters/` registry after input
+loading: the default `generic` adapter applies configured `items_path`, `map`,
+`exclude`, and `snapshot` rules, while special payload/publication semantics
+may use a sibling adapter. `source_id` identifies a source and `adapter_id`
+identifies the reusable implementation. The local-radar Markdown bridge
+remains a compatibility adapter for that producer-owned publication only.
+`report_json` is no longer accepted.
 
 ## OpenClaw: contract only in v0.3.0
 
