@@ -43,6 +43,7 @@ REASONING = os.environ.get("GLANCE_BRIEF_AGENTS_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
 from glance_brief import cli, source_adapters  # noqa: E402
+from glance_brief import producer_contract  # noqa: E402
 
 PUBLICATION_DIR_VALUE = os.environ.get("GLANCE_BRIEF_AGENTS_PUBLICATION_DIR")
 PUBLICATION_DIR = Path(PUBLICATION_DIR_VALUE).expanduser() if PUBLICATION_DIR_VALUE else None
@@ -96,8 +97,7 @@ def _prefetch(report_date: str) -> dict:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"prefetch returned malformed JSON: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise RuntimeError("prefetch schema_version must be 1")
+    payload = producer_contract.validate_payload(payload, path="agents prefetch output")
     return source_adapters.adapt_payload(
         "open_source_radar",
         payload,

@@ -59,6 +59,8 @@ producer JSON
 
 - [架构](docs/architecture.md)
 - [数据契约](docs/data-contracts.md)
+- [新增来源指南](docs/adding-sources.md)
+- [Producer contract](docs/producer-contract.md)
 - [输出契约](docs/output-contracts.md)
 - [`agents-report` Skill](skills/agents-report/SKILL.md)
 - [`noon-news` Skill](skills/noon-news/SKILL.md)

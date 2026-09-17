@@ -48,6 +48,21 @@ All schema-3 sources use the explicit `snapshot_json` driver when reading the
 shared immutable prefetch snapshot. There is no `report_json` compatibility
 alias in the reports runtime.
 
+For adding a normal source, see [`docs/adding-sources.md`](../../docs/adding-sources.md)
+and [`docs/producer-contract.md`](../../docs/producer-contract.md). The offline
+`source check` and `source preview` commands exercise one captured producer
+payload without calling a model or sending a report:
+
+```bash
+PYTHONPATH=runtime/reports/lib python3 runtime/reports/lib/glance_brief/cli.py source check \
+  --config config/brief.reports.example.json \
+  --source <source-id> --payload /path/to/schema-1.json
+```
+
+The editor-facing configuration schema is
+[`config/brief.reports.schema.json`](../../config/brief.reports.schema.json); the
+runtime Python validator remains authoritative.
+
 ## Repository-to-Hermes mapping
 
 Install explicitly with:

@@ -130,7 +130,24 @@ aihot
 - Noon `selection_limits`：最终选择数量的 min/max；
 - producer-owned snapshot metadata。
 
-不支持 shell string、动态 import、HTTP driver、模板 DSL 或 legacy converter。
+不支持 shell string、动态 import、HTTP driver、模板 DSL 或 legacy converter。编辑器
+辅助 schema 位于 `config/brief.reports.schema.json`；运行时 Python validator
+仍是最终权威。新增普通来源的完整流程见 `docs/adding-sources.md`。
+
+## Producer contract
+
+reports runtime 接收的 source prefetch stdout 必须是一个 schema-1 JSON envelope：
+
+```text
+{
+  "schema_version": 1,
+  "<source_namespace>": object | array
+}
+```
+
+至少要有一个 namespace；stdout 不得混入日志、Markdown、模型响应或投递结果。
+诊断写 stderr，失败用非零退出码。机器可读辅助 schema 位于
+`config/producer-output.schema.json`，运行时由 `producer_contract.py` 做最终检查。
 
 ## reports production source input schema 3
 

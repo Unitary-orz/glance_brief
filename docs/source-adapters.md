@@ -106,6 +106,11 @@ registry 找不到 adapter 或 adapter 没有统一入口时必须 fail closed�
 
 ## 新增来源的选择
 
+完整的产品接入流程见 [`docs/adding-sources.md`](adding-sources.md)，producer stdout
+约束见 [`docs/producer-contract.md`](producer-contract.md)。如果只需要确认一个
+捕获 payload 的 mapping，可使用 reports runtime 的 `source check` / `source preview`
+命令；它们不调用模型，也不投递消息。
+
 优先级从简单到复杂：
 
 1. 新来源只需字段路径映射：配置 `adapter: generic`，增加 fixture 和测试；

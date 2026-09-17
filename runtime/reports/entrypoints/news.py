@@ -45,7 +45,7 @@ PROVIDER = os.environ.get("GLANCE_BRIEF_NEWS_PROVIDER", "minimax-cn")
 REASONING = os.environ.get("GLANCE_BRIEF_NEWS_REASONING", "medium")
 
 sys.path.insert(0, str(LIB_ROOT))
-from glance_brief import adapters, cli, contracts  # noqa: E402
+from glance_brief import adapters, cli, contracts, producer_contract  # noqa: E402
 
 
 def _run(command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
@@ -92,9 +92,7 @@ def _prefetch() -> dict:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"prefetch returned malformed JSON: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise RuntimeError("prefetch schema_version must be 1")
-    return payload
+    return producer_contract.validate_payload(payload, path="news prefetch output")
 
 
 def _prepare() -> dict:

@@ -441,6 +441,8 @@ class FormalInstallerTests(unittest.TestCase):
                 "lib/glance_brief/source_adapters/__init__.py",
                 "lib/glance_brief/source_adapters/generic.py",
                 "lib/glance_brief/source_adapters/local_open_source_radar.py",
+                "lib/glance_brief/producer_contract.py",
+                "lib/glance_brief/source_diagnostics.py",
                 "lib/glance_brief/profiles.py",
                 "lib/glance_brief/prompts/agents-report.md",
                 "lib/glance_brief/prompts/noon-news.md",

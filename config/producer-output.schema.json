@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Unitary-orz/glance_brief/blob/main/config/producer-output.schema.json",
+  "title": "glance_brief producer output",
+  "description": "Schema for one source prefetch stdout envelope. Runtime validation is implemented by producer_contract.py.",
+  "type": "object",
+  "minProperties": 2,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "ok": {"type": "boolean"},
+    "error": {"type": ["string", "null"]},
+    "instructions": {"type": ["string", "object", "array"]},
+    "generated_at": {"type": "string"}
+  },
+  "patternProperties": {
+    "^(?!(schema_version|ok|error|instructions|generated_at)$).+$": {
+      "type": ["object", "array"]
+    }
+  },
+  "not": {
+    "type": "object",
+    "properties": {
+      "schema_version": {},
+      "ok": {},
+      "error": {},
+      "instructions": {},
+      "generated_at": {}
+    },
+    "additionalProperties": false
+  },
+  "additionalProperties": false
+}

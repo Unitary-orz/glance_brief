@@ -19,9 +19,9 @@ from zoneinfo import ZoneInfo
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from glance_brief import adapters, contracts, profiles, render_report, resolve
+    from glance_brief import adapters, contracts, profiles, render_report, resolve, source_diagnostics
 else:
-    from . import adapters, contracts, profiles, render_report, resolve
+    from . import adapters, contracts, profiles, render_report, resolve, source_diagnostics
 
 HERE = Path(__file__).resolve().parent
 REPORTS = (contracts.NOON_REPORT, contracts.AGENTS_REPORT)
@@ -687,6 +687,24 @@ def parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="validate a v0.3.0 source/report config")
     check.add_argument("--config", required=True, type=Path)
 
+    source = commands.add_parser("source", help="inspect one source without a model call")
+    source_commands = source.add_subparsers(dest="source_command", required=True)
+    for source_command in ("check", "preview"):
+        source_parser = source_commands.add_parser(
+            source_command,
+            help="check mapping as JSON" if source_command == "check" else "preview mapped candidates",
+        )
+        source_parser.add_argument("--config", required=True, type=Path)
+        source_parser.add_argument("--source", required=True)
+        source_parser.add_argument(
+            "--payload",
+            required=True,
+            type=Path,
+            help="captured schema-1 producer JSON; never calls a producer",
+        )
+        source_parser.add_argument("--report", choices=REPORTS)
+        source_parser.add_argument("--limit", type=int, default=5)
+
     probe = commands.add_parser("probe", help="assemble one report without a model call")
     probe.add_argument("--config", required=True, type=Path)
     probe.add_argument("--report", required=True, choices=REPORTS)
@@ -733,6 +751,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(path.read_text(encoding="utf-8"), end="")
             else:
                 print(path)
+            return 0
+        if args.command == "source":
+            config = load_json(args.config)
+            payload = source_diagnostics.load_payload(args.payload)
+            result = source_diagnostics.check_source(
+                config,
+                args.source,
+                payload,
+                report_id=args.report,
+                limit=args.limit,
+            )
+            if args.source_command == "preview":
+                print(source_diagnostics.render_preview(result), end="")
+            else:
+                print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
             return 0
         config = load_json(args.config)
         adapters.validate_config(config)
