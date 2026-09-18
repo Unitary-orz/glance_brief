@@ -13,7 +13,9 @@
 python3 -m py_compile \
   skills/agents-report/scripts/*.py \
   skills/noon-news/scripts/*.py
-python3 -m unittest discover -s tests -p 'test_*.py'
+python3 -B -m unittest discover -s tests -p 'test_*.py'
+python3 -B -m unittest discover -s producers/local-open-source-radar/tests -p 'test_*.py'
+python3 -B -m unittest discover -s runtime/reports/tests -p 'test_*.py'
 git diff --check
 ```
 
@@ -25,7 +27,7 @@ Use Conventional Commits, for example:
 feat(news): add noon-news prefetch contract
 fix(skill): preserve independent source line
 refactor(repo): separate runtime adapters from skills
-release(repo): publish v0.1.0
+release(repo): publish vX.Y.Z
 ```
 
 Keep a commit focused on one logical change when possible.

@@ -2,7 +2,7 @@
 
 > 本项目使用 Conventional Commits 格式：`type(scope): summary`
 >
-> 参考：[git-commit-governance](../skills/git-commit-governance/SKILL.md)
+> 本页为 legacy 文档，仅供历史兼容参考；当前贡献约定见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 
 ---
 

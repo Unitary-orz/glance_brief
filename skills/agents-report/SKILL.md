@@ -14,14 +14,18 @@ triggers:
 
 ## 正式入口
 
-两份报告共享项目级 `glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
+本 Skill、顶层 `glance_brief/prompts/*` 和 `glance-brief/*` 入口都属于
+schema 2 legacy compatibility line；在这条兼容线上，两份报告共享项目级
+`glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
 
 ```bash
 python3 -m glance_brief check --config config/brief.example.json
 python3 -m glance_brief probe --config config/brief.example.json --report agents-report
 ```
 
-两条运行线有意并存。schema 2 legacy 安装后使用
+当前正式 reports production 不使用顶层 `glance_brief/prompts/*` 作为唯一
+语义契约；它使用 `runtime/reports/lib/glance_brief/prompts/*` 及其所在的
+reports core。两条运行线有意并存：schema 2 legacy 安装后使用
 `glance-brief/agents-report.py`；当前 reports production 安装后使用
 `glance-brief-reports/agents.py`，完成一次来源快照、外层 Agent semantic
 handoff、严格 resolver、确定性渲染和 artifacts。
@@ -49,7 +53,10 @@ handoff、严格 resolver、确定性渲染和 artifacts。
 - 验证 GitHub URL、quality、fresh 子集和分类唯一完整覆盖；
 - deterministic render、manifest 和 replay。
 
-完整语义契约见 `glance_brief/prompts/agents-report.md`，可见格式见 `docs/output-contracts.md`。
+schema 2 legacy compatibility line 的完整语义契约见
+`glance_brief/prompts/agents-report.md`；当前正式 reports production 的语义 Prompt 位于
+`runtime/reports/lib/glance_brief/prompts/agents-report.md`，由
+`glance-brief-reports/agents.py` 入口使用。可见格式见 `docs/output-contracts.md`。
 
 ## 固定结构
 

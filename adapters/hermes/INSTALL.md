@@ -61,9 +61,15 @@ $HERMES_HOME/scripts/glance-brief-reports/
 └── cron-prompts/                # sanitized outer-Agent handoff prompts
 
 $HERMES_HOME/data/glance-brief-reports/config/
-├── brief.reports.example.json   # installed example; fixture-backed
+├── brief.reports.example.json   # installed config template
 └── brief-live.json              # user-authored schema 3 config
 ```
+
+The repository example is fixture-backed in a checkout, but the installer copies
+only this config template; it does not copy
+`tests/fixtures/pipeline/reports-snapshot.json`. The installed copy is not directly runnable: replace
+its fixture paths with live source paths and write
+`brief-live.json` before use.
 
 The flat wrappers set `HERMES_HOME` and `GLANCE_BRIEF_REPORTS_ROOT` from their
 installed location, so the mapping is relocatable under a different Hermes

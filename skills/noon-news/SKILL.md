@@ -14,14 +14,18 @@ triggers:
 
 ## 正式入口
 
-两份报告共享项目级 `glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
+本 Skill、顶层 `glance_brief/prompts/*` 和 `glance-brief/*` 入口都属于
+schema 2 legacy compatibility line；在这条兼容线上，两份报告共享项目级
+`glance_brief` core。仓库 CLI 用于配置检查、离线运行和 replay：
 
 ```bash
 python3 -m glance_brief check --config config/brief.example.json
 python3 -m glance_brief probe --config config/brief.example.json --report noon-news
 ```
 
-两条运行线有意并存。schema 2 legacy 安装后使用
+当前正式 reports production 不使用顶层 `glance_brief/prompts/*` 作为唯一
+语义契约；它使用 `runtime/reports/lib/glance_brief/prompts/*` 及其所在的
+reports core。两条运行线有意并存：schema 2 legacy 安装后使用
 `glance-brief/noon-news.py`；当前 reports production 安装后使用
 `glance-brief-reports/news.py`，完成一次来源快照、外层 Agent semantic handoff、
 严格 resolver、确定性渲染和 artifacts。
@@ -47,7 +51,10 @@ URL、来源标签、发布时间和原题必须来自 producer，不得搜索�
 
 模型不得返回 URL、来源、日期、Markdown，不得跨候选合并事实或换算数字。
 
-程序负责回填原题、来源、精确 URL、发布时间，根据规范化后的标题/正文派生 `title_only`，验证数字 provenance、selection limits 和安全文本，并生成固定 Markdown。`title_only` 不改变筛选、配额、优先级或排序。完整语义契约见 `glance_brief/prompts/noon-news.md`，可见格式见 `docs/output-contracts.md`。
+程序负责回填原题、来源、精确 URL、发布时间，根据规范化后的标题/正文派生 `title_only`，验证数字 provenance、selection limits 和安全文本，并生成固定 Markdown。`title_only` 不改变筛选、配额、优先级或排序。schema 2 legacy compatibility line 的完整语义契约见
+`glance_brief/prompts/noon-news.md`；当前正式 reports production 的语义 Prompt 位于
+`runtime/reports/lib/glance_brief/prompts/noon-news.md`，由
+`glance-brief-reports/news.py` 入口使用。可见格式见 `docs/output-contracts.md`。
 
 ## 固定结构
 
