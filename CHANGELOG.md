@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — Unreleased
+## 0.3.0 — 2026-09-18
 
 - 仓库、Skill 与公开文档统一为 glance_brief v0.3.0；保留顶层 schema 2 legacy 线，并将当前 reports production runtime 作为独立、可重建的 `runtime/reports/` source tree 管理。
 - 纳入独立 `local-open-source-radar` producer 的源码、配置和测试；根安装器不自动安装或调度该 producer，Agents 通过显式 publication 边界消费其结构化结果。
